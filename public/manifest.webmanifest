@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "Ship Administration Portal — INS Tushil",
+  "short_name": "ShipPortal",
+  "description": "Offline Naval Ship Administration, Gunnery Office Routine & Watchbill, Training Matrix, and Leave Forecast Portal.",
+  "theme_color": "#0a0c0f",
+  "background_color": "#0a0c0f",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

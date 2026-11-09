@@ -27,15 +27,34 @@ import {
   CheckCircle2,
   Filter,
   ListFilter,
-  Grid3X3
+  Grid3X3,
+  Printer,
+  FileText,
+  AlertTriangle,
+  RotateCcw,
+  XCircle,
+  Check
 } from 'lucide-react';
+import { MonthlyBulletinModal } from './MonthlyBulletinModal';
+import { HolidayEntry } from '../types';
 
 interface PublicCalendarViewProps {
   sessions: ScheduledSession[];
   topics: Topic[];
+  blackoutDates?: HolidayEntry[];
+  isAdmin?: boolean;
+  onUpdateSession?: (session: ScheduledSession) => void;
+  onReschedule?: (session: ScheduledSession) => void;
 }
 
-export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions, topics }) => {
+export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ 
+  sessions, 
+  topics, 
+  blackoutDates = [],
+  isAdmin = false,
+  onUpdateSession,
+  onReschedule
+}) => {
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [selectedSubDept, setSelectedSubDept] = useState<string>('ALL');
   const [selectedTrack, setSelectedTrack] = useState<'ALL' | 'COMPANY_WIDE' | 'DEPARTMENTAL'>('ALL');
@@ -56,6 +75,7 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
   const [currentMonthDate, setCurrentMonthDate] = useState<Date>(initialDate);
   const [activeSessionDetail, setActiveSessionDetail] = useState<ScheduledSession | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
 
   // Section list dynamically computed based on selected Department
   const availableSections = useMemo(() => {
@@ -345,6 +365,16 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
               </span>
             </button>
 
+            {/* Monthly Bulletin Board PDF */}
+            <button
+              onClick={() => setIsBulletinModalOpen(true)}
+              title="Generate professional-looking PDF specifically formatted for ship bulletin boards"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm active:scale-95"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Bulletin PDF</span>
+            </button>
+
             {/* Rich Text Clipboard Copy for Teams / Outlook */}
             <button
               onClick={handleCopyTeamsSchedule}
@@ -411,6 +441,15 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
 
             <div className="flex items-center gap-1.5">
               <button
+                onClick={() => setIsBulletinModalOpen(true)}
+                title="Generate professional-looking PDF of this month for ship bulletin board"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm active:scale-95 mr-1"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Bulletin Board PDF</span>
+              </button>
+
+              <button
                 onClick={handlePrevMonth}
                 className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors border border-slate-700"
                 title="Previous Month"
@@ -473,9 +512,18 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
                       {cell.dayNum}
                     </span>
                     {cell.sessions.length > 0 && (
-                      <span className="text-[10px] font-mono text-slate-400">
-                        {cell.sessions[0].startTime}
-                      </span>
+                      <div className="flex items-center gap-1">
+                        {cell.sessions.length > 1 && cell.sessions.some((s1, i) =>
+                          cell.sessions.some((s2, j) => i !== j && s1.department !== s2.department && (s1.startTime === s2.startTime || (s1.endTime && s2.endTime && s1.startTime < s2.endTime && s2.startTime < s1.endTime)))
+                        ) && (
+                          <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40" title="Concurrent department conflict: Multiple departments scheduled simultaneously">
+                            ⚠️ Slot Clash
+                          </span>
+                        )}
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {cell.sessions[0].startTime}
+                        </span>
+                      </div>
                     )}
                   </div>
 
@@ -484,6 +532,11 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
                     {cell.sessions.map((session) => {
                       const dept = getDepartmentConfig(session.department);
                       const isCompany = session.trackType === 'COMPANY_WIDE';
+                      const isConcurrent = cell.sessions.some(other =>
+                        other.id !== session.id &&
+                        other.department !== session.department &&
+                        (other.startTime === session.startTime || (other.endTime && session.endTime && other.startTime < session.endTime && session.startTime < other.endTime))
+                      );
 
                       return (
                         <div
@@ -491,9 +544,11 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
                           onClick={() => setActiveSessionDetail(session)}
                           style={{ borderLeftColor: dept.color }}
                           className={`p-1.5 rounded text-[11px] cursor-pointer transition-all border-l-2 shadow-xs group ${
-                            isCompany 
-                              ? 'bg-blue-950/70 hover:bg-blue-900/80 border-blue-500' 
-                              : 'bg-slate-800 hover:bg-slate-700/90 border-emerald-500'
+                            isConcurrent
+                              ? 'bg-amber-950/40 border-amber-500/80 ring-1 ring-amber-500/30'
+                              : isCompany 
+                                ? 'bg-blue-950/70 hover:bg-blue-900/80 border-blue-500' 
+                                : 'bg-slate-800 hover:bg-slate-700/90 border-emerald-500'
                           }`}
                         >
                           <div className="flex items-center justify-between gap-1">
@@ -503,9 +558,16 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
                             >
                               {session.department}
                             </span>
-                            <span className="text-[9px] text-slate-400 font-mono">
-                              #{session.sequenceNumber}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              {isConcurrent && (
+                                <span className="text-[8px] font-bold text-amber-300 bg-amber-950 px-1 rounded border border-amber-700/50" title="Concurrent department conflict">
+                                  ⚠️ Clash
+                                </span>
+                              )}
+                              <span className="text-[9px] text-slate-400 font-mono">
+                                #{session.sequenceNumber}
+                              </span>
+                            </div>
                           </div>
                           <div className="font-medium text-slate-100 group-hover:text-blue-300 line-clamp-2 leading-tight mt-0.5">
                             {session.title}
@@ -637,7 +699,7 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
             </button>
 
             {/* Department & Track Tag */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span 
                 className="px-2.5 py-0.5 rounded text-xs font-bold"
                 style={{ 
@@ -653,7 +715,105 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
               <span className="text-xs font-mono text-slate-500">
                 · Session #{activeSessionDetail.sequenceNumber}
               </span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                activeSessionDetail.status === 'Completed'
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : activeSessionDetail.status === 'Skipped'
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    : activeSessionDetail.status === 'Rescheduled'
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                      : 'bg-slate-800 text-slate-400 border border-slate-700'
+              }`}>
+                {activeSessionDetail.status || 'Scheduled'}
+              </span>
+              {activeSessionDetail.adminOverride && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-amber-400" />
+                  <span>Concurrent Override</span>
+                </span>
+              )}
             </div>
+
+            {/* Admin Override Alert if concurrent session */}
+            {activeSessionDetail.adminOverride && (
+              <div className="p-2.5 bg-amber-950/40 border border-amber-800/60 rounded-lg text-xs text-amber-200 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>
+                  <strong>Caution: Concurrent Lecture Conflict</strong> — Admin override active. This lecture is scheduled concurrently with another session on {activeSessionDetail.date} at {activeSessionDetail.startTime}.
+                </span>
+              </div>
+            )}
+
+            {/* Admin Status & Reschedule Controls */}
+            {isAdmin && onUpdateSession && (
+              <div className="p-3 bg-slate-900/90 rounded-xl border border-slate-800 space-y-2">
+                <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                  Admin Action: Update Session Status & Reschedule
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const updated: ScheduledSession = { ...activeSessionDetail, status: 'Completed' };
+                      onUpdateSession(updated);
+                      setActiveSessionDetail(updated);
+                    }}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors ${
+                      activeSessionDetail.status === 'Completed'
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Completed</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const updated: ScheduledSession = { ...activeSessionDetail, status: 'Skipped' };
+                      onUpdateSession(updated);
+                      setActiveSessionDetail(updated);
+                    }}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors ${
+                      activeSessionDetail.status === 'Skipped'
+                        ? 'bg-rose-700 text-white'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Skipped</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      const updated: ScheduledSession = { ...activeSessionDetail, status: 'Scheduled' };
+                      onUpdateSession(updated);
+                      setActiveSessionDetail(updated);
+                    }}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 transition-colors ${
+                      activeSessionDetail.status === 'Scheduled' || !activeSessionDetail.status
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <span>Scheduled</span>
+                  </button>
+
+                  {onReschedule && (
+                    <button
+                      onClick={() => {
+                        const target = activeSessionDetail;
+                        setActiveSessionDetail(null);
+                        onReschedule(target);
+                      }}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg flex items-center gap-1 bg-amber-600/80 hover:bg-amber-600 text-white transition-colors ml-auto"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span>Reschedule Date…</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Title */}
             <h2 className="text-lg font-bold text-white leading-snug">
@@ -753,6 +913,20 @@ export const PublicCalendarView: React.FC<PublicCalendarViewProps> = ({ sessions
             </div>
           </div>
         </div>
+      )}
+
+      {/* Monthly Notice Board Bulletin PDF Modal */}
+      {isBulletinModalOpen && (
+        <MonthlyBulletinModal
+          isOpen={isBulletinModalOpen}
+          onClose={() => setIsBulletinModalOpen(false)}
+          sessions={sessions}
+          holidays={blackoutDates}
+          shipName={ship.name}
+          shipPennant={ship.pennant}
+          initialMonthDate={currentMonthDate}
+          settings={settings}
+        />
       )}
     </div>
   );

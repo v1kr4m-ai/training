@@ -58,6 +58,7 @@ interface AdminMatrixTableProps {
   /** Date / time / length changes go here so conflicts can be checked and, for the administrator, overridden. */
   onMoveSession: (updated: ScheduledSession) => void;
   onReschedule: (session: ScheduledSession) => void;
+  onOpenCreateSession?: () => void;
 }
 
 const STATUS_TEXT: Record<string, string> = {
@@ -84,7 +85,8 @@ export const AdminMatrixTable: React.FC<AdminMatrixTableProps> = ({
   today,
   isAdmin,
   onMoveSession,
-  onReschedule
+  onReschedule,
+  onOpenCreateSession
 }) => {
   const settings = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
@@ -268,6 +270,17 @@ export const AdminMatrixTable: React.FC<AdminMatrixTableProps> = ({
 
           {/* Global Cascade & Admin Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {onOpenCreateSession && (
+              <button
+                onClick={onOpenCreateSession}
+                title="Schedule a new session with daily, weekly, or bi-weekly repeat"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm active:scale-95"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>+ New Session</span>
+              </button>
+            )}
+
             <button
               onClick={() => onCascadeReschedule(1)}
               title="Recalculates dates for all sessions skipping holidays, blackouts, and weekends, and restores prerequisite orders."
@@ -495,9 +508,13 @@ export const AdminMatrixTable: React.FC<AdminMatrixTableProps> = ({
                             <span 
                               key={i}
                               onClick={() => onOpenConflictModal(c)}
-                              className="text-[10px] font-medium text-amber-400 hover:underline cursor-pointer flex items-center gap-1"
+                              className={`text-[10px] font-semibold hover:underline cursor-pointer flex items-center gap-1 px-1.5 py-0.5 rounded mt-0.5 ${
+                                c.type === 'TIME_SLOT_DEPARTMENT_CONFLICT'
+                                  ? 'bg-rose-950/80 text-rose-300 border border-rose-700/60 shadow-xs'
+                                  : 'text-amber-400'
+                              }`}
                             >
-                              ⚠️ {c.message}
+                              {c.type === 'TIME_SLOT_DEPARTMENT_CONFLICT' ? '⚠️ MULTI-DEPT CONFLICT: ' : '⚠️ '} {c.message}
                             </span>
                           ))}
                         </div>
@@ -525,13 +542,22 @@ export const AdminMatrixTable: React.FC<AdminMatrixTableProps> = ({
                           <select
                             aria-label="Session status"
                             value={session.status}
-                            onChange={e => onUpdateSession({ ...session, status: e.target.value as SessionStatus })}
-                            className={`bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] ${STATUS_TEXT[session.status] || 'text-slate-200'}`}
+                            onChange={e => {
+                              const val = e.target.value as SessionStatus;
+                              if (val === 'Rescheduled') {
+                                onReschedule(session);
+                              } else {
+                                onUpdateSession({ ...session, status: val });
+                              }
+                            }}
+                            className={`bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-[11px] font-semibold cursor-pointer ${STATUS_TEXT[session.status] || 'text-slate-200'}`}
                           >
                             <option value="Scheduled">Scheduled</option>
                             <option value="Completed">Completed</option>
                             <option value="Skipped">Skipped</option>
-                            {(session.status === 'Rescheduled' || session.status === 'Postponed' || session.status === 'Cancelled') && <option value={session.status}>{session.status}</option>}
+                            <option value="Rescheduled">Rescheduled</option>
+                            <option value="Postponed">Postponed</option>
+                            <option value="Cancelled">Cancelled</option>
                           </select>
                         ) : (
                           <span className={`text-[11px] font-semibold ${STATUS_TEXT[session.status] || 'text-slate-300'}`}>{session.status}</span>

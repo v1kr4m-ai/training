@@ -121,7 +121,7 @@ export function parseTopicTable(text: string, existing: Topic[] = [], required: 
 export const topicTemplateCsv = () => TOPIC_TEMPLATE_HEADER.join(',') + '\n';
 
 // Self-check: node --experimental-strip-types src/utils/topicImport.ts
-if (typeof process !== 'undefined' && process.argv[1]?.endsWith('topicImport.ts')) {
+if (typeof process !== 'undefined' && Array.isArray(process?.argv) && process.argv[1]?.endsWith('topicImport.ts')) {
   const ok = (c: boolean, m: string) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
   const r = parseTopicTable(
     'title,department,speaker,prerequisite,description\n' +

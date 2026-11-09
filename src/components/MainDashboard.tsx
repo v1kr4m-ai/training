@@ -13,6 +13,8 @@ import { shipTitle } from '../portal/ship';
 import { useSettings } from '../utils/settingsContext';
 import { describeDays, describeTime } from '../utils/settings';
 import { ReadinessRing } from './ReadinessRing';
+import { DepartmentAnalyticsChart } from './DepartmentAnalyticsChart';
+import { MonthlyBulletinModal } from './MonthlyBulletinModal';
 import { ChevronLeft, ChevronRight, Download, Printer, Upload, Calendar as CalendarIcon, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
 
 interface MainDashboardProps {
@@ -43,6 +45,7 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
     const now = new Date();
     return now.getFullYear() === year ? now.getMonth() : 0;
   });
+  const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
 
   const stats = useMemo(() => {
     const completed = sessions.filter(s => s.status === 'Completed').length;
@@ -137,7 +140,15 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-bold text-slate-800 font-mono">{MONTHS[month]} {year}</h3>
-              <div className="flex gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsBulletinModalOpen(true)}
+                  title={`Export ${MONTHS[month]} ${year} Notice Board PDF`}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors active:scale-95"
+                >
+                  <Printer className="w-3 h-3 text-blue-600" />
+                  <span>Bulletin PDF</span>
+                </button>
                 <button aria-label="Prev" disabled={month === 0} onClick={() => setMonth(m => m - 1)} className="p-1 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30"><ChevronLeft className="w-3.5 h-3.5" /></button>
                 <button aria-label="Next" disabled={month === 11} onClick={() => setMonth(m => m + 1)} className="p-1 rounded-full bg-slate-100 text-slate-500 hover:text-slate-800 disabled:opacity-30"><ChevronRight className="w-3.5 h-3.5" /></button>
               </div>
@@ -181,9 +192,25 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         </div>
 
+        {/* Data Visualization Component: Departmental Training Completion Rates & Attendance Trends (Recharts) */}
+        <DepartmentAnalyticsChart
+          sessions={sessions}
+          topics={topics}
+          year={year}
+          onNavigateTab={onNavigateTab}
+        />
+
         {/* Coverage / Dept Cards */}
         <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-800 mb-3">Departmental Readiness</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-800">Departmental Quota & Readiness</h3>
+            <button
+              onClick={() => onNavigateTab('QUARTERLY')}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              <span>Quarterly Trends & Hours →</span>
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {deptRows.map(r => (
               <div key={r.name} onClick={() => onNavigateTab('DEPARTMENTS')} className="p-3 rounded-xl bg-slate-50 border border-slate-100 cursor-pointer hover:border-slate-300 transition-colors group">
@@ -201,6 +228,20 @@ export const MainDashboard: React.FC<MainDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Monthly Notice Board Bulletin PDF Modal */}
+      {isBulletinModalOpen && (
+        <MonthlyBulletinModal
+          isOpen={isBulletinModalOpen}
+          onClose={() => setIsBulletinModalOpen(false)}
+          sessions={sessions}
+          holidays={blackoutDates}
+          shipName={ship.name}
+          shipPennant={ship.pennant}
+          initialMonthDate={new Date(year, month, 1)}
+          settings={settings}
+        />
+      )}
     </div>
   );
 };

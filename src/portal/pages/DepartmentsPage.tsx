@@ -4,19 +4,23 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Settings2, Trash2 } from 'lucide-react';
+import { ArrowLeft, Plus, Settings2, Trash2, FileText } from 'lucide-react';
 import { DEPARTMENT_NAMES, getDepartmentConfig } from '../../data/departments';
 import { onLeave, todayIso } from '../leaveLogic';
 import { usePortal } from '../store';
 import { btnGhost, btnPrimary, Card, Empty, inputCls, PageHeader } from '../ui';
 import { DepartmentsOrbit } from './DepartmentsOrbit';
 import { DepartmentsManager } from '../DepartmentsManager';
+import { DailyOrdersPage } from './DailyOrdersPage';
+import { WatchAndStationBillManager } from './WatchAndStationBillManager';
+import { Anchor } from 'lucide-react';
 
 export const DepartmentsPage: React.FC<{ selected: string | null; go: (p: string) => void }> = ({ selected, go }) => {
-  const { db, user, update, subDepartments } = usePortal();
+  const { db, user, update, subDepartments, showGunneryOnHome, setShowGunneryOnHome } = usePortal();
   const [newSub, setNewSub] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [managing, setManaging] = useState(false);
+  const [execGunneryTab, setExecGunneryTab] = useState<'WATCHBILL' | 'DAILY_ORDERS'>('WATCHBILL');
   const isAdmin = user?.role === 'ADMIN';
   const awayToday = useMemo(() => new Set(onLeave(db, todayIso()).map(r => r.personId)), [db]);
 
@@ -120,6 +124,66 @@ export const DepartmentsPage: React.FC<{ selected: string | null; go: (p: string
             )}
           </Card>
         </div>
+
+        {selected === 'Executive' && (
+          <div className="pt-2 space-y-5">
+            <div className="p-5 rounded-3xl bg-gradient-to-r from-blue-950/70 via-slate-900 to-slate-950 border border-blue-800/60 flex flex-wrap items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="text-[10px] font-mono uppercase tracking-widest text-blue-400 font-bold">
+                  Executive Department · Gunnery & Routine Office
+                </div>
+                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                  <Anchor className="w-4 h-4 text-amber-400" />
+                  <span>Gunnery & Routine Office — Watch & Station Bill & Daily Orders</span>
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Manage the ship's Watch & Station Bill template, Special Parties (e.g. Aviation Core Team), Duty Rosters, and Daily Orders Part I.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showGunneryOnHome}
+                    onChange={e => setShowGunneryOnHome(e.target.checked)}
+                    className="rounded accent-emerald-500"
+                  />
+                  <span>Show Gunnery Card on Home Page</span>
+                </label>
+
+                <div className="flex items-center gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setExecGunneryTab('WATCHBILL')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+                      execGunneryTab === 'WATCHBILL' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Anchor className="w-3.5 h-3.5" />
+                    <span>Watch & Station Bill</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setExecGunneryTab('DAILY_ORDERS')}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors whitespace-nowrap ${
+                      execGunneryTab === 'DAILY_ORDERS' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Daily Orders & Notice Board</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {execGunneryTab === 'WATCHBILL' ? (
+              <WatchAndStationBillManager />
+            ) : (
+              <DailyOrdersPage />
+            )}
+          </div>
+        )}
       </div>
     );
   }

@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { btnGhost, btnPrimary, Card } from '../ui';
 import { ListsSettings } from '../ListsSettings';
+import { LanSyncManager } from '../LanSyncManager';
 
 type SettingSection = {
   id: string;
@@ -135,9 +136,18 @@ const SETTINGS_CONFIG: SettingSection[] = [
 ];
 
 export const SettingsPage: React.FC = () => {
-  const { navPosition, setNavPosition, customHeaders, setCustomHeader } = usePortal();
-  const [activeSection, setActiveSection] = useState('account');
-  const [activeItem, setActiveItem] = useState('profile');
+  const {
+    navPosition,
+    setNavPosition,
+    pinNavBar,
+    setPinNavBar,
+    showGunneryOnHome,
+    setShowGunneryOnHome,
+    customHeaders,
+    setCustomHeader
+  } = usePortal();
+  const [activeSection, setActiveSection] = useState('preferences');
+  const [activeItem, setActiveItem] = useState('appearance');
 
   const currentSection = SETTINGS_CONFIG.find(s => s.id === activeSection) || SETTINGS_CONFIG[0];
 
@@ -213,12 +223,12 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="space-y-8">
-            {activeItem === 'appearance' ? (
-              <div className="space-y-6">
+            {activeItem === 'appearance' || activeItem === 'general' ? (
+              <div className="space-y-5">
                 <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
                   <div>
                     <p className="text-sm font-medium text-white">Navigation Position</p>
-                    <p className="text-xs text-white/50">Choose where the main menu is located</p>
+                    <p className="text-xs text-white/50">Choose whether the main navigation is placed on the Top Bar or Side Bar</p>
                   </div>
                   <select
                     value={navPosition}
@@ -228,6 +238,46 @@ export const SettingsPage: React.FC = () => {
                     <option value="top">Top Bar</option>
                     <option value="side">Side Bar</option>
                   </select>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div>
+                    <p className="text-sm font-medium text-white">Fix / Pin Navigation Bar Across All Pages</p>
+                    <p className="text-xs text-white/50">
+                      When off, the Top Bar is shown on the Home page and auto-hides into the hover-bulge arrow dock on other pages. Turn on to keep the bar fixed at all times.
+                    </p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 cursor-pointer shrink-0 ml-4">
+                    <input
+                      type="checkbox"
+                      checked={pinNavBar}
+                      onChange={e => setPinNavBar(e.target.checked)}
+                      className="w-4 h-4 rounded accent-blue-500"
+                    />
+                    <span className="text-xs font-semibold text-slate-200">
+                      {pinNavBar ? 'Fixed (Pinned)' : 'Auto-Hide on Subpages'}
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10">
+                  <div>
+                    <p className="text-sm font-medium text-white">Show Gunnery & Routine Card on Home Page</p>
+                    <p className="text-xs text-white/50">
+                      Gunnery & Routine lives under Executive Department (not in the Top Bar). Enable this to also display a quick-access card on the Home page.
+                    </p>
+                  </div>
+                  <label className="inline-flex items-center gap-2 cursor-pointer shrink-0 ml-4">
+                    <input
+                      type="checkbox"
+                      checked={showGunneryOnHome}
+                      onChange={e => setShowGunneryOnHome(e.target.checked)}
+                      className="w-4 h-4 rounded accent-emerald-500"
+                    />
+                    <span className="text-xs font-semibold text-slate-200">
+                      {showGunneryOnHome ? 'Shown on Home' : 'Hidden on Home'}
+                    </span>
+                  </label>
                 </div>
 
                 <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-4">
@@ -254,6 +304,8 @@ export const SettingsPage: React.FC = () => {
               </div>
             ) : activeItem === 'lists' ? (
               <ListsSettings />
+            ) : activeItem === 'storage' || activeItem === 'integrations' || activeItem === 'data-mgmt' ? (
+              <LanSyncManager />
             ) : (
               <div className="p-8 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-4">
                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/20">

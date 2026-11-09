@@ -28,7 +28,8 @@ export type ConflictType =
   | 'WEEKEND_COLLISION' 
   | 'SLOT_TYPE_MISMATCH' 
   | 'STARVATION_ANOMALY' 
-  | 'DUPLICATE_DATE';
+  | 'DUPLICATE_DATE'
+  | 'TIME_SLOT_DEPARTMENT_CONFLICT';
 
 export interface Topic {
   id: string;
@@ -74,6 +75,22 @@ export interface ScheduledSession {
   adminOverride?: boolean;
   rescheduledFrom?: RescheduleEntry[];
   status: SessionStatus;
+  /** Attendance muster record for completed or conducted training sessions */
+  attendanceMuster?: {
+    recordedAt: string;
+    recordedBy: string;
+    presentPersonIds: string[];
+    absentRecords: Array<{
+      personId: string;
+      reason: 'ON_LEAVE' | 'WATCHKEEPING' | 'SPECIAL_PARTY' | 'SICK_BAY' | 'TY_DUTY' | 'UNEXCUSED';
+      makeUpRequired: boolean;
+      makeUpSessionId?: string;
+      makeUpCompleted?: boolean;
+    }>;
+  };
+  /** Indicates if this session is a dedicated make-up / mop-up lecture for prior absentees */
+  isMakeUpSession?: boolean;
+  parentSessionId?: string;
 }
 
 export interface ScheduleConflict {
@@ -125,4 +142,4 @@ export interface MatrixMetrics {
   starvationAlerts: Array<{ department: string; maxGapSessions: number }>;
 }
 
-export type ActiveTab = 'DASHBOARD' | 'DEPARTMENTS' | 'ADMIN' | 'PUBLIC' | 'ANALYTICS';
+export type ActiveTab = 'DASHBOARD' | 'QUARTERLY' | 'DEPARTMENTS' | 'ADMIN' | 'PUBLIC' | 'ANALYTICS' | 'MUSTER';

@@ -401,10 +401,26 @@ export function auditScheduleConflicts(
       }
     }
 
-    // 5. Same day: other sessions that day, and whether their time overlaps (same start counts when an end is not set)
+    // 5. Same day: other sessions that day, and whether their time overlaps
     const sameDay = (dateCounts.get(s.date) || []).filter(o => o.id !== s.id);
     const overlapping = sameDay.filter(o => o.startTime === s.startTime || (o.endTime && s.endTime && o.startTime < s.endTime && s.startTime < o.endTime));
-    if (overlapping.length > 0) {
+    
+    // Check if multiple departments are assigned to the same time slot
+    const diffDeptOverlaps = overlapping.filter(o => o.department !== s.department);
+    if (diffDeptOverlaps.length > 0) {
+      const otherDeptNames = Array.from(new Set(diffDeptOverlaps.map(o => o.department))).join(', ');
+      conflicts.push({
+        sessionId: s.id,
+        sessionTitle: s.title,
+        sessionDate: s.date,
+        type: 'TIME_SLOT_DEPARTMENT_CONFLICT',
+        severity: 'warning',
+        message: `Concurrent Department Conflict: Scheduled at ${s.startTime}${s.endTime ? `-${s.endTime}` : ''} concurrently with ${otherDeptNames} (${diffDeptOverlaps.map(o => `"${o.title}"`).join(', ')}).`,
+        details: {
+          conflictingDate: s.date
+        }
+      });
+    } else if (overlapping.length > 0) {
       conflicts.push({
         sessionId: s.id,
         sessionTitle: s.title,
@@ -419,13 +435,69 @@ export function auditScheduleConflicts(
         sessionTitle: s.title,
         sessionDate: s.date,
         type: 'DUPLICATE_DATE',
-        severity: 'warning',
+        severity: 'info',
         message: `${sameDay.length} other session(s) on ${s.date}, at different times (more than one session on one day).`
       });
     }
   });
 
   return conflicts;
+}
+
+/**
+ * Helper function to identify and group all time-slot conflicts where multiple departments
+ * are assigned to the exact same time slot on the same date.
+ */
+export interface TimeSlotDepartmentConflictGroup {
+  date: string;
+  startTime: string;
+  endTime: string;
+  departments: string[];
+  sessions: ScheduledSession[];
+  conflictMessage: string;
+}
+
+export function identifyTimeSlotDepartmentConflicts(sessions: ScheduledSession[]): TimeSlotDepartmentConflictGroup[] {
+  const activeSessions = sessions.filter(s => s.status !== 'Skipped' && s.status !== 'Cancelled');
+  const byDate = new Map<string, ScheduledSession[]>();
+  activeSessions.forEach(s => {
+    const list = byDate.get(s.date) || [];
+    list.push(s);
+    byDate.set(s.date, list);
+  });
+
+  const conflictGroups: TimeSlotDepartmentConflictGroup[] = [];
+
+  byDate.forEach((daySessions, date) => {
+    if (daySessions.length < 2) return;
+
+    const processedPairs = new Set<string>();
+    for (let i = 0; i < daySessions.length; i++) {
+      for (let j = i + 1; j < daySessions.length; j++) {
+        const s1 = daySessions[i];
+        const s2 = daySessions[j];
+        const pairKey = [s1.id, s2.id].sort().join(':');
+        if (processedPairs.has(pairKey)) continue;
+
+        const timesOverlap = s1.startTime === s2.startTime || (s1.endTime && s2.endTime && s1.startTime < s2.endTime && s2.startTime < s1.endTime);
+        const differentDepts = s1.department !== s2.department;
+
+        if (timesOverlap && differentDepts) {
+          processedPairs.add(pairKey);
+          conflictGroups.push({
+            date,
+            startTime: s1.startTime,
+            endTime: s1.endTime || s2.endTime || '',
+            departments: Array.from(new Set([s1.department, s2.department])),
+            sessions: [s1, s2],
+            conflictMessage: `Concurrent department conflict on ${date} at ${s1.startTime}: ${s1.department} and ${s2.department} are assigned to the same time slot.`
+          });
+        }
+      }
+    }
+  });
+
+  return conflictGroups;
 }
 
 /**

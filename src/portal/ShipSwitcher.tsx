@@ -17,13 +17,13 @@ export const ShipSwitcher: React.FC<{ variant?: 'pill' | 'block' }> = ({ variant
   const pill = variant === 'pill';
 
   return (
-    <div className="relative">
+    <div className="relative z-50">
       <button
         onClick={() => setOpen(o => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
         className={pill
-          ? 'flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-xs font-semibold hover:bg-white/90'
+          ? 'flex items-center gap-2 px-4 py-2 rounded-full bg-white text-black text-xs font-semibold hover:bg-white/90 shadow-sm'
           : 'w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-white/10 text-xs text-slate-100 hover:bg-white/5'}
       >
         <Anchor className="w-3.5 h-3.5" />
@@ -33,8 +33,8 @@ export const ShipSwitcher: React.FC<{ variant?: 'pill' | 'block' }> = ({ variant
 
       {open && (
         <>
-          <button aria-label="Close ship menu" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-          <div role="listbox" className="absolute z-[60] right-0 mt-2 w-60 bg-[#12151a] border border-white/10 rounded-2xl shadow-2xl p-1.5 text-left">
+          <button aria-label="Close ship menu" className="fixed inset-0 z-[140] cursor-default" onClick={() => setOpen(false)} />
+          <div role="listbox" className="absolute z-[150] right-0 mt-2 w-64 bg-[#12151a] border border-white/20 rounded-2xl shadow-2xl p-1.5 text-left">
             {ships.map(s => (
               <button
                 key={s.id}

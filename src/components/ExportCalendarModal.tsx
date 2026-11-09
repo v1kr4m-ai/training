@@ -4,9 +4,10 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import type { ScheduledSession } from '../types';
 import { ExportFormat, ExportLayout, PeriodKind, periodLabel, periodRange, runExport, sessionsBetween } from '../utils/calendarExport';
+import { downloadMonthlyBulletinPdf } from '../utils/monthlyBulletinPdf';
 
 const field = 'bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-blue-500';
 const Choice: React.FC<{ on: boolean; onPick: () => void; label: string; hint?: string }> = ({ on, onPick, label, hint }) => (
@@ -99,6 +100,35 @@ export const ExportCalendarModal: React.FC<{ sessions: ScheduledSession[]; year:
             </div>
           </div>
         )}
+
+        {/* Notice Board Bulletin Callout */}
+        <div className="p-3 bg-blue-950/40 border border-blue-800/60 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div>
+            <div className="font-bold text-white flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <span>Looking for Ship Notice Board Prints?</span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Generate official monthly training bulletins with naval masthead, muster directives, and sign-off blocks.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const [y, m] = (kind === 'MONTH' ? month : today.slice(0, 7)).split('-').map(Number);
+              downloadMonthlyBulletinPdf({
+                monthDate: new Date(y, m - 1, 1),
+                sessions,
+                shipName,
+                paperSize: 'A4'
+              });
+            }}
+            className="shrink-0 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold transition-colors shadow-sm active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Bulletin PDF</span>
+          </button>
+        </div>
 
         {error && <div className="text-xs text-rose-400" role="alert">{error}</div>}
         <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">

@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { ArrowRight, CalendarDays, Newspaper, Pencil } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { ArrowRight, CalendarDays, Newspaper, Pencil, Clock, CheckCircle2, Layers, Anchor, FileText } from 'lucide-react';
 import { getDepartmentConfig } from '../../data/departments';
 import { todayIso } from '../leaveLogic';
 import { trainingKey } from '../registry';
@@ -30,7 +30,7 @@ function nextTraining(shipId: string, today: string): ScheduledSession | null {
 }
 
 export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
-  const { db, user, ship, shipId } = usePortal();
+  const { db, user, ship, shipId, showGunneryOnHome, setShowGunneryOnHome } = usePortal();
   const stats = useLiveStats();
   const isAdmin = user?.role === 'ADMIN';
   const [editing, setEditing] = useState(false);
@@ -46,6 +46,74 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
   const light = rest.length ? `${prefix} ` : '';
   const commandWords = ship.command.split(/\s+/).filter(Boolean);
   const first = user?.displayName.split(/\s+/)[0];
+
+  // Full training sessions for this ship
+  const allSessions: ScheduledSession[] = useMemo(() => {
+    try {
+      const s = JSON.parse(localStorage.getItem(trainingKey(shipId)) || 'null');
+      return Array.isArray(s?.sessions) ? s.sessions : [];
+    } catch {
+      return [];
+    }
+  }, [shipId]);
+
+  const todayStr = todayIso();
+  const todayDate = useMemo(() => new Date(`${todayStr}T12:00:00`), [todayStr]);
+
+  // Current week days (Monday - Sunday) & sessions
+  const { currentWeekDays, weekSessions, isShiftedWeek } = useMemo(() => {
+    const dayOfWeek = todayDate.getDay();
+    const diffToMon = (dayOfWeek + 6) % 7;
+    let mon = new Date(todayDate);
+    mon.setDate(todayDate.getDate() - diffToMon);
+
+    const getDaysForMon = (baseMon: Date) => [0, 1, 2, 3, 4, 5, 6].map(offset => {
+      const d = new Date(baseMon);
+      d.setDate(baseMon.getDate() + offset);
+      const iso = d.toISOString().slice(0, 10);
+      return {
+        date: iso,
+        dayName: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][offset],
+        dayNum: d.getDate(),
+        monthName: d.toLocaleString('en-US', { month: 'short' }),
+        isToday: iso === todayStr
+      };
+    });
+
+    let days = getDaysForMon(mon);
+    let sessions = allSessions.filter(s => s.date >= days[0].date && s.date <= days[6].date && s.status !== 'Cancelled');
+    let shifted = false;
+
+    // If current week has no sessions but schedule exists elsewhere, focus on the nearest training week
+    if (sessions.length === 0 && allSessions.length > 0) {
+      const nextSession = allSessions.filter(s => s.date >= todayStr && s.status === 'Scheduled').sort((a, b) => a.date.localeCompare(b.date))[0]
+        || allSessions.sort((a, b) => a.date.localeCompare(b.date))[0];
+      if (nextSession) {
+        const nextD = new Date(`${nextSession.date}T12:00:00`);
+        const nextDiff = (nextD.getDay() + 6) % 7;
+        const nextMon = new Date(nextD);
+        nextMon.setDate(nextD.getDate() - nextDiff);
+        days = getDaysForMon(nextMon);
+        sessions = allSessions.filter(s => s.date >= days[0].date && s.date <= days[6].date && s.status !== 'Cancelled');
+        shifted = true;
+      }
+    }
+
+    return {
+      currentWeekDays: days,
+      weekSessions: sessions,
+      isShiftedWeek: shifted
+    };
+  }, [allSessions, todayDate, todayStr]);
+
+  const weekHours = useMemo(() => {
+    const mins = weekSessions.reduce((acc, s) => acc + (s.durationMinutes || 60), 0);
+    return Math.round((mins / 60) * 10) / 10;
+  }, [weekSessions]);
+
+  const weekUpcoming = useMemo(() => weekSessions.filter(s => s.status === 'Scheduled').length, [weekSessions]);
+  const shipWideWeek = useMemo(() => weekSessions.filter(s => s.trackType === 'COMPANY_WIDE').length, [weekSessions]);
+  const deptWeek = useMemo(() => weekSessions.filter(s => s.trackType === 'DEPARTMENTAL').length, [weekSessions]);
 
   return (
     <div className="space-y-6">
@@ -155,6 +223,238 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
               </ul>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Optional Gunnery & Routine Office (Executive Department) Card on Home Page */}
+      {showGunneryOnHome && (
+        <section className="bg-gradient-to-r from-slate-900 via-blue-950/35 to-slate-900 border border-blue-800/50 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-blue-400 font-bold">
+              <Anchor className="w-3.5 h-3.5 text-amber-400" />
+              <span>Executive Department · Gunnery & Routine Office</span>
+            </div>
+            <h2 className="text-base font-bold text-white">
+              Watch & Station Bill, Special Parties & Daily Orders Part I
+            </h2>
+            <p className="text-xs text-slate-400 max-w-2xl">
+              Generate clash-free Watch & Station Bills from the Nominal Roll, excuse Special Parties (e.g. Aviation Core Team), and publish Daily Orders Part I under the Executive Department.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => go('departments/Executive')}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm whitespace-nowrap"
+            >
+              <Anchor className="w-3.5 h-3.5" />
+              <span>Open in Executive Dept</span>
+            </button>
+            <button
+              onClick={() => go('watchbill')}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition-colors whitespace-nowrap"
+            >
+              <span>Watch & Station Bill</span>
+            </button>
+            <button
+              onClick={() => go('daily-orders')}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition-colors whitespace-nowrap"
+            >
+              <FileText className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Daily Orders</span>
+            </button>
+            <button
+              onClick={() => setShowGunneryOnHome(false)}
+              title="Hide Gunnery & Routine card from Home Page (can be re-enabled in Settings or Executive Department)"
+              className="px-2.5 py-2 rounded-xl text-[11px] text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+            >
+              Hide Card
+            </button>
+          </div>
+        </section>
+      )}
+
+      {/* Weekly Training Schedule Summary Section (Compact Grid Layout) */}
+      <section className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-bold text-white tracking-tight">
+                Weekly Training Schedule & Activity Outlook
+              </h2>
+              {isShiftedWeek && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Upcoming Active Week
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Operational training program for {currentWeekDays[0]?.dayName} {currentWeekDays[0]?.dayNum} {currentWeekDays[0]?.monthName} – {currentWeekDays[6]?.dayName} {currentWeekDays[6]?.dayNum} {currentWeekDays[6]?.monthName} {currentWeekDays[0]?.date.slice(0, 4)}.
+            </p>
+          </div>
+
+          <button
+            onClick={() => go('training')}
+            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm self-start sm:self-auto active:scale-95"
+          >
+            <span>Open Training Planner</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {/* High-Level Weekly Metric Summary KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
+              <span>Planned Training Hours</span>
+              <Clock className="w-3.5 h-3.5 text-blue-400" />
+            </div>
+            <div className="text-2xl font-black font-mono text-white mt-1">
+              {weekHours} <span className="text-xs font-normal text-slate-400">hrs</span>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              Across {weekSessions.length} total sessions
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
+              <span>Upcoming Sessions</span>
+              <CalendarDays className="w-3.5 h-3.5 text-emerald-400" />
+            </div>
+            <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
+              {weekUpcoming} <span className="text-xs font-normal text-slate-400">pending</span>
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              {weekSessions.filter(s => s.status === 'Completed').length} completed this week
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
+              <span>Track Distribution</span>
+              <Layers className="w-3.5 h-3.5 text-amber-400" />
+            </div>
+            <div className="text-lg font-bold font-mono text-white mt-1">
+              {shipWideWeek} Ship-Wide · {deptWeek} Dept
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              Mon/Thu ship-wide, Tue/Wed/Fri dept
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="flex items-center justify-between text-slate-400 text-[11px] font-medium">
+              <span>Readiness Focus</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
+            </div>
+            <div className="text-base font-bold text-slate-200 mt-1 truncate">
+              {weekSessions[0]?.department || 'Fleet Ready'}
+            </div>
+            <div className="text-[10px] text-slate-500 mt-0.5">
+              {allSessions.length} annual curriculum slots
+            </div>
+          </div>
+        </div>
+
+        {/* Compact Daily Schedule Grid (Monday - Sunday) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-2.5 pt-1">
+          {currentWeekDays.map(day => {
+            const daySessions = weekSessions.filter(s => s.date === day.date);
+
+            return (
+              <div
+                key={day.date}
+                className={`p-3 rounded-2xl border flex flex-col justify-between transition-all ${
+                  day.isToday
+                    ? 'bg-blue-950/30 border-blue-500/70 shadow-sm ring-1 ring-blue-500/30'
+                    : daySessions.length > 0
+                      ? 'bg-slate-950/70 border-slate-800 hover:border-slate-700'
+                      : 'bg-slate-950/40 border-slate-800/60 opacity-80'
+                }`}
+              >
+                <div>
+                  {/* Day Header */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-xs font-bold ${day.isToday ? 'text-blue-400' : 'text-slate-300'}`}>
+                        {day.dayName}
+                      </span>
+                      <span className="text-[11px] font-mono text-slate-500">
+                        {day.dayNum}
+                      </span>
+                    </div>
+
+                    {day.isToday && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-blue-500 text-white">
+                        TODAY
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Sessions or Idle notice */}
+                  <div className="mt-2 space-y-2">
+                    {daySessions.length === 0 ? (
+                      <div className="py-4 text-center">
+                        <span className="text-[10px] text-slate-600 block">
+                          No training
+                        </span>
+                        <span className="text-[9px] text-slate-700 block font-mono mt-0.5">
+                          Duty watch
+                        </span>
+                      </div>
+                    ) : (
+                      daySessions.map(session => {
+                        const cfg = getDepartmentConfig(session.department);
+
+                        return (
+                          <div
+                            key={session.id}
+                            onClick={() => go('training')}
+                            className="p-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 cursor-pointer transition-all space-y-1.5 group"
+                          >
+                            <div className="flex items-center justify-between gap-1">
+                              <span
+                                className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded"
+                                style={{ backgroundColor: `${cfg.color}25`, color: cfg.color }}
+                              >
+                                {cfg.code}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-400">
+                                {session.startTime}
+                              </span>
+                            </div>
+
+                            <p className="text-xs font-semibold text-slate-200 group-hover:text-blue-300 line-clamp-2 leading-tight">
+                              {session.title}
+                            </p>
+
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-800/60">
+                              <span className="truncate max-w-[85px]">{session.speaker || session.subDepartment || 'All hands'}</span>
+                              <span className={`font-mono text-[9px] ${session.status === 'Completed' ? 'text-emerald-400 font-bold' : 'text-slate-400'}`}>
+                                {session.status === 'Completed' ? '✓ Done' : `${session.durationMinutes || 60}m`}
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {daySessions.length > 0 && (
+                  <div className="mt-2 pt-1.5 border-t border-slate-800/60 text-right">
+                    <span className="text-[9px] font-mono text-slate-500">
+                      {daySessions.length} session{daySessions.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
 

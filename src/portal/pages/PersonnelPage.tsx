@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Database, KeyRound, Pencil, Plus, Upload } from 'lucide-react';
+import { Database, KeyRound, Pencil, Plus, Upload, Search, X, FileSpreadsheet, Download } from 'lucide-react';
 import { DEPARTMENT_NAMES } from '../../data/departments';
 import { downloadBlob } from '../../utils/exporters';
 import { readTableFile, TABLE_FILE_ACCEPT } from '../../utils/readTableFile';
@@ -40,7 +40,7 @@ export const PersonnelPage: React.FC = () => {
     const s = q.trim().toLowerCase();
     return db.personnel
       .filter(p => (showInactive || p.active) && (dept === 'ALL' || p.department === dept) && (cat === 'ALL' || p.category === cat))
-      .filter(p => !s || `${p.serviceNo} ${p.name} ${p.rank} ${p.designation}`.toLowerCase().includes(s))
+      .filter(p => !s || `${p.name} ${p.department} ${p.subDepartment || ''} ${p.serviceNo} ${p.rank} ${p.designation || ''}`.toLowerCase().includes(s))
       .sort((a, b) => a.department.localeCompare(b.department) || a.name.localeCompare(b.name));
   }, [db.personnel, q, dept, cat, showInactive]);
 
@@ -59,7 +59,7 @@ export const PersonnelPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader
         title={customHeaders['personnel'] || 'Nominal Roll'}
         subtitle="The ship's Nominal Roll. Departments, leave and daily figures are built on these records."
@@ -67,27 +67,116 @@ export const PersonnelPage: React.FC = () => {
           <>
             <button className={btnPrimary} onClick={() => setEditing(blank())}><Plus className="w-3.5 h-3.5" /> Add person</button>
             <button className={btnGhost} onClick={() => setImporting(true)}><Upload className="w-3.5 h-3.5" /> Import</button>
-            <button className={btnGhost} onClick={backup}><Database className="w-3.5 h-3.5" /> Backup all data</button>
+            <button
+              className={btnGhost}
+              onClick={() => {
+                fetch('/data/nominal_roll.json')
+                  .then(r => r.ok ? r.json() : null)
+                  .then(data => {
+                    if (Array.isArray(data) && data.length) {
+                      update(d => ({ ...d, personnel: data }));
+                    }
+                  });
+              }}
+              title="Load standard naval nominal roll entries from external data file"
+            >
+              <Database className="w-3.5 h-3.5 text-blue-400" />
+              <span>Load Roll Data</span>
+            </button>
+            <a href="/templates/Nominal_Roll_Template.xlsx" download="Nominal_Roll_Template.xlsx" className={btnGhost} title="Download official Excel template for Nominal Roll">
+              <Download className="w-3.5 h-3.5 text-emerald-400" /> Excel Template
+            </a>
+            <button className={btnGhost} onClick={backup}><Database className="w-3.5 h-3.5" /> Backup</button>
             <button className={btnGhost} onClick={() => restoreRef.current?.click()}>Restore</button>
             <input ref={restoreRef} type="file" accept=".json" className="hidden" onChange={restore} />
           </>
         )}
       />
 
-      <Card>
-        <div className="flex flex-wrap gap-3 mb-4 items-end">
-          <div className="w-56"><Field label="Search"><input className={inputCls} value={q} onChange={e => setQ(e.target.value)} placeholder="Name, service no., rank" /></Field></div>
-          <div className="w-44"><Field label="Department">
-            <select className={inputCls} value={dept} onChange={e => setDept(e.target.value)}>
-              <option value="ALL">All</option>{DEPARTMENT_NAMES.map(d => <option key={d}>{d}</option>)}
-            </select></Field></div>
-          <div className="w-36"><Field label="Category">
-            <select className={inputCls} value={cat} onChange={e => setCat(e.target.value)}>
-              <option value="ALL">All</option><option>Officer</option><option>Sailor</option><option>Civilian</option>
-            </select></Field></div>
-          <label className="flex items-center gap-2 text-xs text-slate-400 pb-2"><input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} /> Include inactive</label>
-          <div className="ml-auto text-xs text-slate-500 pb-2">{rows.length} of {db.personnel.length}</div>
+      {/* Prominent Search Bar at the Top of Nominal Roll Module */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              placeholder="Search personnel by name or department (e.g. Sharma, Engineering, Executive, Navigation)..."
+              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 font-medium"
+            />
+            {q && (
+              <button
+                onClick={() => setQ('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded"
+                title="Clear search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <select
+              aria-label="Filter by category"
+              className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-blue-500 font-medium"
+              value={cat}
+              onChange={e => setCat(e.target.value)}
+            >
+              <option value="ALL">All Categories</option>
+              <option>Officer</option>
+              <option>Sailor</option>
+              <option>Civilian</option>
+            </select>
+
+            <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer px-2 py-1.5 bg-slate-950 border border-slate-800 rounded-xl">
+              <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="rounded bg-slate-800 border-slate-700 text-blue-500 focus:ring-0" />
+              <span className="text-[11px]">Inactive</span>
+            </label>
+          </div>
         </div>
+
+        {/* Quick Filter Department Pills */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-800/80">
+          <span className="text-[10px] uppercase font-mono text-slate-500 mr-1">Quick Dept:</span>
+          <button
+            onClick={() => setDept('ALL')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
+              dept === 'ALL'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white'
+            }`}
+          >
+            All ({db.personnel.length})
+          </button>
+          {DEPARTMENT_NAMES.map(d => {
+            const count = db.personnel.filter(p => p.department === d).length;
+            const isSelected = dept === d;
+            return (
+              <button
+                key={d}
+                onClick={() => setDept(isSelected ? 'ALL' : d)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 ${
+                  isSelected
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                }`}
+              >
+                <span>{d}</span>
+                <span className={`text-[10px] font-mono px-1 rounded ${isSelected ? 'bg-blue-700 text-white' : 'bg-slate-800 text-slate-400'}`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+
+          <div className="ml-auto text-xs font-mono text-slate-400">
+            {rows.length} of {db.personnel.length} listed
+          </div>
+        </div>
+      </div>
+
+      <Card>
 
         {rows.length === 0 ? (
           <Empty>{db.personnel.length === 0 ? (isAdmin ? 'No personnel yet. Use "Add person" or "Import" to enter the ship\'s roll.' : 'No personnel have been entered yet.') : 'No one matches these filters.'}</Empty>

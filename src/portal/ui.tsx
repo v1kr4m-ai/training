@@ -61,9 +61,11 @@ export const Modal: React.FC<{ title: string; onClose: () => void; children: Rea
 );
 
 const STATUS: Record<string, { label: string; cls: string }> = {
+  PENDING_DO: { label: 'Awaiting Dept/Section Officer', cls: 'bg-cyan-950/70 text-cyan-300 border-cyan-800/60' },
   PENDING_HOD: { label: 'Awaiting HoD', cls: 'bg-amber-950/70 text-amber-300 border-amber-800/60' },
-  PENDING_CO: { label: 'Awaiting CO', cls: 'bg-amber-950/70 text-amber-300 border-amber-800/60' },
-  PENDING_ADMIN: { label: 'Awaiting Administrator', cls: 'bg-amber-950/70 text-amber-300 border-amber-800/60' },
+  PENDING_EXO: { label: 'Awaiting EXO (Executive Officer)', cls: 'bg-purple-950/70 text-purple-300 border-purple-800/60' },
+  PENDING_CO: { label: 'Awaiting CO (Commanding Officer)', cls: 'bg-blue-950/70 text-blue-300 border-blue-800/60' },
+  PENDING_ADMIN: { label: 'Awaiting Administrator', cls: 'bg-slate-800 text-slate-300 border-slate-700' },
   APPROVED: { label: 'Approved', cls: 'bg-emerald-950/70 text-emerald-300 border-emerald-800/60' },
   REJECTED: { label: 'Rejected', cls: 'bg-rose-950/70 text-rose-300 border-rose-800/60' },
   CANCELLED: { label: 'Cancelled', cls: 'bg-slate-800 text-slate-400 border-slate-700' }

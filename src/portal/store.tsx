@@ -32,6 +32,10 @@ interface Store {
   replaceDb: (d: Db) => void;
   navPosition: 'top' | 'side';
   setNavPosition: (pos: 'top' | 'side') => void;
+  pinNavBar: boolean;
+  setPinNavBar: (pin: boolean) => void;
+  showGunneryOnHome: boolean;
+  setShowGunneryOnHome: (show: boolean) => void;
   customHeaders: Record<string, string>;
   setCustomHeader: (key: string, value: string) => void;
 }
@@ -61,8 +65,35 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
     try { localStorage.setItem(DB, JSON.stringify(db)); } catch (e) { console.error('Could not save the portal data', e); }
   }, [db, DB]);
 
+  // Auto-load nominal roll from external asset file if empty (avoids embedding data in code)
+  useEffect(() => {
+    if (db.personnel.length === 0) {
+      fetch('/data/nominal_roll.json')
+        .then(res => (res.ok ? res.json() : null))
+        .then((data: Person[] | null) => {
+          if (Array.isArray(data) && data.length > 0) {
+            setDb(prev => (prev.personnel.length === 0 ? { ...prev, personnel: data } : prev));
+          }
+        })
+        .catch(err => console.info('Note: external nominal_roll.json not loaded:', err));
+    }
+  }, [db.personnel.length]);
+
   const [navPosition, setNavPosition] = useState<'top' | 'side'>(() => {
     try { return (localStorage.getItem('nav_position' as string) as 'top' | 'side') || 'top'; } catch { return 'top'; }
+  });
+
+  const [pinNavBar, setPinNavBar] = useState<boolean>(() => {
+    try { return localStorage.getItem('pin_nav_bar') === 'true'; } catch { return false; }
+  });
+
+  const [showGunneryOnHome, setShowGunneryOnHome] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem('show_gunnery_on_home');
+      return v === null ? true : v === 'true';
+    } catch {
+      return true;
+    }
   });
 
   const [customHeaders, setCustomHeaders] = useState<Record<string, string>>(() => {
@@ -72,6 +103,14 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
   useEffect(() => {
     try { localStorage.setItem('nav_position', navPosition); } catch (e) { console.error('Could not save nav position', e); }
   }, [navPosition]);
+
+  useEffect(() => {
+    try { localStorage.setItem('pin_nav_bar', String(pinNavBar)); } catch (e) { console.error('Could not save pinNavBar', e); }
+  }, [pinNavBar]);
+
+  useEffect(() => {
+    try { localStorage.setItem('show_gunnery_on_home', String(showGunneryOnHome)); } catch (e) { console.error('Could not save showGunneryOnHome', e); }
+  }, [showGunneryOnHome]);
 
   useEffect(() => {
     try { localStorage.setItem('custom_headers', JSON.stringify(customHeaders)); } catch (e) { console.error('Could not save custom headers', e); }
@@ -132,7 +171,7 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
   }, []);
 
   return (
-    <Ctx.Provider value={{ db, shipId: ref.id, ship: db.ship, updateShip, update, user, me, setupAdmin, login, logout, subDepartments, replaceDb, navPosition, setNavPosition, customHeaders, setCustomHeader }}>
+    <Ctx.Provider value={{ db, shipId: ref.id, ship: db.ship, updateShip, update, user, me, setupAdmin, login, logout, subDepartments, replaceDb, navPosition, setNavPosition, pinNavBar, setPinNavBar, showGunneryOnHome, setShowGunneryOnHome, customHeaders, setCustomHeader }}>
       {children}
     </Ctx.Provider>
   );

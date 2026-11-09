@@ -3,9 +3,33 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ship Portal</title>
-    <meta name="description" content="Offline ship administration portal." />
-    <meta property="og:title" content="Ship Portal" />
+    <title>Ship Administration Portal</title>
+    <meta name="description" content="Offline training planner for INS Tushil: places topics on working days (13:45-14:45), ship-wide Mon/Thu and departmental Tue/Wed/Fri, resolves prerequisites, rotates departments fairly, and exports CSV, iCalendar and print." />
+    <meta property="og:title" content="Ship Administration Portal" />
+    <meta property="og:description" content="Offline training planner for INS Tushil: places topics on working days (13:45-14:45), ship-wide Mon/Thu and departmental Tue/Wed/Fri, resolves prerequisites, rotates departments fairly, and exports CSV, iCalendar and print." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="theme-color" content="#0a0c0f" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="ShipPortal" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var i = 0; i < regs.length; i++) {
+            var r = regs[i];
+            var url = (r.active && r.active.scriptURL) || (r.installing && r.installing.scriptURL) || (r.waiting && r.waiting.scriptURL) || '';
+            if (url.indexOf('dev-sw.js') !== -1) {
+              r.unregister();
+            }
+          }
+        }).catch(function() {});
+      }
+    </script>
   </head>
   <body class="bg-slate-900 text-slate-100 antialiased font-sans">
     <div id="root"></div>

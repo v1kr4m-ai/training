@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import type { Db, LeaveRequest, LeaveStatus, Person, Role, User } from './types.ts';
+import type { Db, LeaveRequest, LeaveStatus, Person, Role, User, SystemNotification, DepartmentLeaveForecastEntry } from './types.ts';
 
 const DAY = 86_400_000;
 const toMs = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
@@ -22,7 +22,8 @@ export function daysInYear(from: string, to: string, year: number): number {
   return daysBetween(a, b);
 }
 
-export const isPending = (s: LeaveStatus) => s === 'PENDING_HOD' || s === 'PENDING_CO' || s === 'PENDING_ADMIN';
+export const isPending = (s: LeaveStatus) =>
+  s === 'PENDING_DO' || s === 'PENDING_HOD' || s === 'PENDING_EXO' || s === 'PENDING_CO' || s === 'PENDING_ADMIN';
 
 export interface Balance {
   typeId: string;
@@ -49,14 +50,18 @@ export function balances(db: Db, personId: string, year: number, today: string):
         pending += daysInYear(r.from, r.to, year);
       }
     }
+    // Include baseline or manual availed adjustments recorded on the person's record
+    const manualAvailed = db.availedAdjustments?.[personId]?.[t.id]?.days ?? 0;
+    const totalAvailed = availed + manualAvailed;
+
     return {
       typeId: t.id,
       typeName: t.name,
       entitled: t.annualDays,
-      availed,
+      availed: totalAvailed,
       upcoming,
       pending,
-      available: t.annualDays == null ? null : t.annualDays - availed - upcoming
+      available: t.annualDays == null ? null : Math.max(0, t.annualDays - totalAvailed - upcoming)
     };
   });
 }
@@ -86,32 +91,131 @@ export function validateApplication(
 
 const userOfPerson = (db: Db, personId: string) => db.users.find(u => u.active && u.personId === personId);
 
-/** First approval stage for an application, from who the applicant is. */
+/** 
+ * Naval approval chain:
+ * - Sailor: Section Officer / Department Officer (DO) -> HOD -> EXO (Executive Officer) -> Approved -> Notification to Gunnery Office
+ * - Officer: HOD -> Commanding Officer (CO) -> Approved
+ * - HOD / EXO: Commanding Officer (CO) -> Approved
+ * - CO: Administrator -> Approved
+ */
 export function firstStatus(db: Db, person: Person): LeaveStatus {
-  const role: Role = userOfPerson(db, person.id)?.role ?? 'USER';
-  if (role === 'CO') return 'PENDING_ADMIN';
-  if (role === 'HOD' || role === 'ADMIN') return 'PENDING_CO';
-  // Personnel go to their department head; if the department has none, straight to the CO
-  const hasHod = db.users.some(u => u.active && u.role === 'HOD' && u.personId &&
-    db.personnel.find(p => p.id === u.personId)?.department === person.department);
-  return hasHod ? 'PENDING_HOD' : 'PENDING_CO';
+  const user = userOfPerson(db, person.id);
+  const role: Role = user?.role ?? 'USER';
+  const designation = (person.designation || '').toLowerCase();
+
+  if (role === 'CO' || designation.includes('commanding officer')) return 'PENDING_ADMIN';
+  if (role === 'HOD' || role === 'EXO' || designation.includes('head of department') || designation.includes('executive officer')) {
+    return 'PENDING_CO';
+  }
+
+  // Officer leave goes to HOD, then from HOD to CO
+  if (person.category === 'Officer') {
+    const hasHod = db.users.some(u => u.active && u.role === 'HOD' && u.personId &&
+      db.personnel.find(p => p.id === u.personId)?.department === person.department);
+    return hasHod ? 'PENDING_HOD' : 'PENDING_CO';
+  }
+
+  // Sailor leave goes to Section Officer / Department Officer
+  return 'PENDING_DO';
 }
 
 /** Can this user act on this request at its current stage? */
 export function canDecide(db: Db, user: User, req: LeaveRequest): boolean {
   if (!user.active || user.personId === req.personId) return false;
-  if (req.status === 'PENDING_CO') return user.role === 'CO';
-  if (req.status === 'PENDING_ADMIN') return user.role === 'ADMIN';
+  if (user.role === 'ADMIN') return true; // Administrator can act at any level
+
+  const applicant = db.personnel.find(p => p.id === req.personId);
+  const me = db.personnel.find(p => p.id === user.personId);
+  const userDesignation = (me?.designation || '').toLowerCase();
+
+  if (req.status === 'PENDING_CO') {
+    return user.role === 'CO' || userDesignation.includes('commanding officer');
+  }
+
+  if (req.status === 'PENDING_ADMIN') {
+    return false;
+  }
+
+  if (req.status === 'PENDING_EXO') {
+    return user.role === 'EXO' || user.role === 'CO' || userDesignation.includes('executive officer') || userDesignation.includes('exo');
+  }
+
   if (req.status === 'PENDING_HOD') {
-    const applicant = db.personnel.find(p => p.id === req.personId);
-    const me = db.personnel.find(p => p.id === user.personId);
+    if (user.role === 'CO' || user.role === 'EXO') return true;
     return user.role === 'HOD' && !!applicant && !!me && me.department === applicant.department;
   }
+
+  if (req.status === 'PENDING_DO') {
+    if (user.role === 'CO' || user.role === 'EXO' || user.role === 'HOD') return true;
+    // Section Officer or Department Officer: Officer belonging to the same department
+    return !!applicant && !!me && me.department === applicant.department && me.category === 'Officer';
+  }
+
   return false;
 }
 
-/** Status after an approval at the current stage. */
-export const statusAfterApproval = (s: LeaveStatus): LeaveStatus => (s === 'PENDING_HOD' ? 'PENDING_CO' : 'APPROVED');
+export interface ApprovalStepResult {
+  nextStatus: LeaveStatus;
+  gunneryNotified: boolean;
+  actionDescription: string;
+}
+
+/** 
+ * Status progression after an approval:
+ * - Sailor: PENDING_DO -> PENDING_HOD -> PENDING_EXO -> APPROVED (and triggers Gunnery Office notification)
+ * - Officer: PENDING_HOD -> PENDING_CO -> APPROVED
+ */
+export function getApprovalStepResult(status: LeaveStatus, person?: Person | null): ApprovalStepResult {
+  if (status === 'PENDING_DO') {
+    return {
+      nextStatus: 'PENDING_HOD',
+      gunneryNotified: false,
+      actionDescription: 'Recommended by Department Officer; forwarded to Head of Department (HOD)'
+    };
+  }
+
+  if (status === 'PENDING_HOD') {
+    if (person?.category === 'Sailor') {
+      return {
+        nextStatus: 'PENDING_EXO',
+        gunneryNotified: false,
+        actionDescription: 'Recommended by HOD; forwarded to Executive Officer (EXO)'
+      };
+    }
+    return {
+      nextStatus: 'PENDING_CO',
+      gunneryNotified: false,
+      actionDescription: 'Recommended by HOD; forwarded to Commanding Officer (CO)'
+    };
+  }
+
+  if (status === 'PENDING_EXO') {
+    return {
+      nextStatus: 'APPROVED',
+      gunneryNotified: true,
+      actionDescription: 'Approved by Executive Officer (EXO). Notification dispatched to Gunnery Office.'
+    };
+  }
+
+  if (status === 'PENDING_CO' || status === 'PENDING_ADMIN') {
+    return {
+      nextStatus: 'APPROVED',
+      gunneryNotified: false,
+      actionDescription: 'Approved by Commanding Officer'
+    };
+  }
+
+  return {
+    nextStatus: 'APPROVED',
+    gunneryNotified: false,
+    actionDescription: 'Approved'
+  };
+}
+
+/** Backward-compatible signature returning next LeaveStatus */
+export function statusAfterApproval(s: LeaveStatus, person?: Person | null): LeaveStatus {
+  return getApprovalStepResult(s, person).nextStatus;
+}
 
 /** Active personnel on approved leave (or approved/pending when includePending) on a date. */
 export function onLeave(db: Db, date: string, includePending = false): LeaveRequest[] {
@@ -168,4 +272,242 @@ export function shortfalls(db: Db, from: string, to: string): Shortfall[] {
 export function todayIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+}
+
+export interface ApprovalStepInfo {
+  step: number;
+  label: string;
+  role: Role | 'DO';
+  statusMatch: LeaveStatus;
+  description: string;
+  isGunneryAlert?: boolean;
+}
+
+/**
+ * Returns the exact tiered naval approval chain for a person based on Category & Designation:
+ * - Sailor: Section Officer -> Dept Officer -> HOD -> EXO -> Gunnery Office Notified
+ * - Officer: HOD -> CO
+ * - HOD: CO
+ */
+export function getApprovalRoute(applicant: Person): ApprovalStepInfo[] {
+  const isSailor = applicant.category === 'Sailor';
+  const designation = (applicant.designation || '').toLowerCase();
+  const isHod = designation.includes('hod') || designation.includes('head of department') || designation.includes('officer-in-charge');
+  const isExo = designation.includes('executive officer') || designation.includes('exo');
+
+  if (isSailor) {
+    return [
+      {
+        step: 1,
+        label: 'Section Officer',
+        role: 'DO',
+        statusMatch: 'PENDING_DO',
+        description: 'First review by divisional/section officer'
+      },
+      {
+        step: 2,
+        label: 'Dept Officer',
+        role: 'DO',
+        statusMatch: 'PENDING_DO',
+        description: 'Recommendation by Department Officer (DO)'
+      },
+      {
+        step: 3,
+        label: 'Head of Dept (HOD)',
+        role: 'HOD',
+        statusMatch: 'PENDING_HOD',
+        description: 'Departmental endorsement by Head of Department'
+      },
+      {
+        step: 4,
+        label: 'Executive Officer (EXO)',
+        role: 'EXO',
+        statusMatch: 'PENDING_EXO',
+        description: 'Final sanction & authority by Executive Officer',
+        isGunneryAlert: true
+      }
+    ];
+  }
+
+  if (isHod || isExo) {
+    return [
+      {
+        step: 1,
+        label: 'Commanding Officer (CO)',
+        role: 'CO',
+        statusMatch: 'PENDING_CO',
+        description: 'Direct sanction by Commanding Officer'
+      }
+    ];
+  }
+
+  // General Officer route
+  return [
+    {
+      step: 1,
+      label: 'Head of Dept (HOD)',
+      role: 'HOD',
+      statusMatch: 'PENDING_HOD',
+      description: 'Recommendation by Head of Department'
+    },
+    {
+      step: 2,
+      label: 'Commanding Officer (CO)',
+      role: 'CO',
+      statusMatch: 'PENDING_CO',
+      description: 'Final sanction by Commanding Officer'
+    }
+  ];
+}
+
+/** Creates a system notification for the next authority in the tiered leave chain */
+export function createLeaveNotification(
+  applicant: Person,
+  req: LeaveRequest,
+  action: 'SUBMITTED' | 'FORWARDED' | 'APPROVED' | 'REJECTED',
+  actorName?: string,
+  leaveTypeName?: string
+): SystemNotification[] {
+  const notifications: SystemNotification[] = [];
+  const now = new Date().toISOString();
+  const randomSuffix = Math.random().toString(36).slice(2, 7);
+  const typeLabel = leaveTypeName || 'Leave';
+
+  if (action === 'SUBMITTED') {
+    // Notify next authority based on initial status
+    if (req.status === 'PENDING_DO') {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}`,
+        createdAt: now,
+        targetDepartment: applicant.department,
+        targetRole: 'USER',
+        title: `New Leave Request: ${applicant.rank} ${applicant.name}`,
+        message: `${applicant.rank} ${applicant.name} (${applicant.department}/${applicant.subDepartment}) applied for ${req.days} days ${typeLabel} (${req.from} to ${req.to}). Awaiting Section/Dept Officer recommendation.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_SUBMITTED',
+        fromName: applicant.name
+      });
+      // Also notify HOD of incoming departmental application
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}-hod`,
+        createdAt: now,
+        targetDepartment: applicant.department,
+        targetRole: 'HOD',
+        title: `Dept Leave Alert: ${applicant.rank} ${applicant.name}`,
+        message: `${applicant.rank} ${applicant.name} submitted ${req.days} days ${typeLabel}. Under initial review by Section Officer.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_SUBMITTED',
+        fromName: applicant.name
+      });
+    } else if (req.status === 'PENDING_HOD') {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}`,
+        createdAt: now,
+        targetDepartment: applicant.department,
+        targetRole: 'HOD',
+        title: `Officer Leave Request: ${applicant.rank} ${applicant.name}`,
+        message: `${applicant.rank} ${applicant.name} (${applicant.department}) applied for ${req.days} days ${typeLabel} (${req.from} to ${req.to}). Awaiting HOD recommendation.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_SUBMITTED',
+        fromName: applicant.name
+      });
+    } else if (req.status === 'PENDING_CO') {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}`,
+        createdAt: now,
+        targetRole: 'CO',
+        title: `Leave Application: ${applicant.rank} ${applicant.name}`,
+        message: `${applicant.rank} ${applicant.name} (${applicant.department}) submitted leave request for ${req.days} days ${typeLabel}. Awaiting CO sanction.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_SUBMITTED',
+        fromName: applicant.name
+      });
+    }
+  } else if (action === 'FORWARDED') {
+    // Notify next authority based on current forwarded status
+    if (req.status === 'PENDING_HOD') {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}`,
+        createdAt: now,
+        targetDepartment: applicant.department,
+        targetRole: 'HOD',
+        title: `Leave Forwarded to HOD: ${applicant.rank} ${applicant.name}`,
+        message: `Recommended by ${actorName || 'Dept Officer'}. Awaiting Head of Department endorsement.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_FORWARDED',
+        fromName: actorName
+      });
+    } else if (req.status === 'PENDING_EXO') {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}`,
+        createdAt: now,
+        targetRole: 'EXO',
+        title: `Sailor Leave for EXO Sanction: ${applicant.rank} ${applicant.name}`,
+        message: `Endorsed by HOD (${applicant.department}). Awaiting Executive Officer final approval.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_FORWARDED',
+        fromName: actorName
+      });
+    } else if (req.status === 'PENDING_CO') {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}`,
+        createdAt: now,
+        targetRole: 'CO',
+        title: `Officer Leave for CO Sanction: ${applicant.rank} ${applicant.name}`,
+        message: `Endorsed by HOD (${applicant.department}). Awaiting Commanding Officer sanction.`,
+        link: 'leave',
+        read: false,
+        type: 'LEAVE_FORWARDED',
+        fromName: actorName
+      });
+    }
+  } else if (action === 'APPROVED') {
+    // Notify applicant
+    notifications.push({
+      id: `notif-${Date.now()}-${randomSuffix}-appr`,
+      createdAt: now,
+      targetPersonId: applicant.id,
+      title: `Leave Approved: ${req.from} to ${req.to}`,
+      message: `Your ${typeLabel} request for ${req.days} days has received final approval by ${actorName || 'Command'}.`,
+      link: 'leave',
+      read: false,
+      type: 'LEAVE_APPROVED',
+      fromName: actorName
+    });
+
+    // If sailor, send special notification to Gunnery Office
+    if (applicant.category === 'Sailor' || req.gunneryNotified) {
+      notifications.push({
+        id: `notif-${Date.now()}-${randomSuffix}-gunnery`,
+        createdAt: now,
+        targetDepartment: 'Executive',
+        title: `Gunnery Office Alert: Sailor on Leave`,
+        message: `${applicant.rank} ${applicant.name} (${applicant.department}/${applicant.subDepartment}) approved by EXO for leave from ${req.from} to ${req.to} (${req.days} days). Updated in Daily Orders record.`,
+        link: 'daily-orders',
+        read: false,
+        type: 'GUNNERY_NOTICE',
+        fromName: 'Executive Officer'
+      });
+    }
+  } else if (action === 'REJECTED') {
+    notifications.push({
+      id: `notif-${Date.now()}-${randomSuffix}-rej`,
+      createdAt: now,
+      targetPersonId: applicant.id,
+      title: `Leave Request Not Approved`,
+      message: `Your ${typeLabel} request for ${req.from} to ${req.to} was not approved by ${actorName || 'Authority'}.`,
+      link: 'leave',
+      read: false,
+      type: 'LEAVE_REJECTED',
+      fromName: actorName
+    });
+  }
+
+  return notifications;
 }

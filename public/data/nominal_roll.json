@@ -1,0 +1,200 @@
+[
+  {
+    "id": "person-001",
+    "serviceNo": "04812-B",
+    "name": "Rajesh Sharma",
+    "rank": "Cdr",
+    "designation": "Executive Officer",
+    "category": "Officer",
+    "department": "Executive",
+    "subDepartment": "Operations",
+    "active": true
+  },
+  {
+    "id": "person-002",
+    "serviceNo": "05234-K",
+    "name": "Vikram Rathore",
+    "rank": "Lt Cdr",
+    "designation": "Gunnery Officer",
+    "category": "Officer",
+    "department": "Executive",
+    "subDepartment": "Gunnery",
+    "active": true
+  },
+  {
+    "id": "person-003",
+    "serviceNo": "06112-M",
+    "name": "Ananya Verma",
+    "rank": "Lt",
+    "designation": "Navigating Officer",
+    "category": "Officer",
+    "department": "Executive",
+    "subDepartment": "Navigation",
+    "active": true
+  },
+  {
+    "id": "person-004",
+    "serviceNo": "05349-H",
+    "name": "Amitav Roy",
+    "rank": "Lt Cdr",
+    "designation": "Senior Engineer",
+    "category": "Officer",
+    "department": "Engineering",
+    "subDepartment": "Propulsion",
+    "active": true
+  },
+  {
+    "id": "person-005",
+    "serviceNo": "07120-P",
+    "name": "Deepak Nair",
+    "rank": "Sub Lt",
+    "designation": "Boiler & Aux Officer",
+    "category": "Officer",
+    "department": "Engineering",
+    "subDepartment": "Auxiliaries",
+    "active": true
+  },
+  {
+    "id": "person-006",
+    "serviceNo": "05882-W",
+    "name": "Sanjay Joshi",
+    "rank": "Lt Cdr",
+    "designation": "Electrical Officer",
+    "category": "Officer",
+    "department": "Electrical",
+    "subDepartment": "Power & Generation",
+    "active": true
+  },
+  {
+    "id": "person-007",
+    "serviceNo": "06443-T",
+    "name": "Priya Patel",
+    "rank": "Lt",
+    "designation": "Radar & Sensor Specialist",
+    "category": "Officer",
+    "department": "Electrical",
+    "subDepartment": "Radio/Radar",
+    "active": true
+  },
+  {
+    "id": "person-008",
+    "serviceNo": "06001-L",
+    "name": "Manoj Kumar",
+    "rank": "Lt",
+    "designation": "Logistics & Victualling Officer",
+    "category": "Officer",
+    "department": "Logistics",
+    "subDepartment": "Supply",
+    "active": true
+  },
+  {
+    "id": "person-009",
+    "serviceNo": "05990-C",
+    "name": "Sunita Rao",
+    "rank": "Surg Lt Cdr",
+    "designation": "Senior Medical Officer",
+    "category": "Officer",
+    "department": "Medical",
+    "subDepartment": "Ship Hospital",
+    "active": true
+  },
+  {
+    "id": "person-010",
+    "serviceNo": "06520-E",
+    "name": "Karan Malhotra",
+    "rank": "Lt Cdr",
+    "designation": "Flight Commander",
+    "category": "Officer",
+    "department": "Aviation",
+    "subDepartment": "Flight Operations",
+    "active": true
+  },
+  {
+    "id": "person-011",
+    "serviceNo": "05731-D",
+    "name": "Harish Venkatesh",
+    "rank": "Lt Cdr",
+    "designation": "Damage Control Officer",
+    "category": "Officer",
+    "department": "NBCD",
+    "subDepartment": "Damage Control",
+    "active": true
+  },
+  {
+    "id": "person-012",
+    "serviceNo": "88124-N",
+    "name": "Ramesh Chand",
+    "rank": "MCPO I",
+    "designation": "Chief Boatswain Mate",
+    "category": "Sailor",
+    "department": "Executive",
+    "subDepartment": "Seamanship",
+    "active": true
+  },
+  {
+    "id": "person-013",
+    "serviceNo": "89230-R",
+    "name": "Kuldeep Singh",
+    "rank": "CPO",
+    "designation": "Turbine Watchkeeper",
+    "category": "Sailor",
+    "department": "Engineering",
+    "subDepartment": "Propulsion",
+    "active": true
+  },
+  {
+    "id": "person-014",
+    "serviceNo": "91045-F",
+    "name": "Arvind Swamy",
+    "rank": "PO",
+    "designation": "Fire Control Tech",
+    "category": "Sailor",
+    "department": "Electrical",
+    "subDepartment": "Weapon Electrical",
+    "active": true
+  },
+  {
+    "id": "person-015",
+    "serviceNo": "92481-J",
+    "name": "Gopal Krishnan",
+    "rank": "Leading Seaman",
+    "designation": "Quartermaster",
+    "category": "Sailor",
+    "department": "Executive",
+    "subDepartment": "Navigation",
+    "active": true
+  },
+  {
+    "id": "person-016",
+    "serviceNo": "93112-S",
+    "name": "Bikram Thapa",
+    "rank": "PO",
+    "designation": "DC Section Leader",
+    "category": "Sailor",
+    "department": "NBCD",
+    "subDepartment": "Fire Fighting",
+    "active": true
+  },
+  {
+    "id": "person-017",
+    "serviceNo": "94200-A",
+    "name": "Tarun Roy",
+    "rank": "Leading Air Mechanic",
+    "designation": "Hangar Crew",
+    "category": "Sailor",
+    "department": "Aviation",
+    "subDepartment": "Flight Operations",
+    "active": true
+  },
+  {
+    "id": "person-018",
+    "serviceNo": "95011-H",
+    "name": "Mohammad Rizwan",
+    "rank": "Medical Assistant",
+    "designation": "Sick Bay Attendant",
+    "category": "Sailor",
+    "department": "Medical",
+    "subDepartment": "Ship Hospital",
+    "active": true
+  }
+]

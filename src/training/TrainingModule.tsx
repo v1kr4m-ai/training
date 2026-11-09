@@ -46,6 +46,13 @@ import { AnalyticsView } from '../components/AnalyticsView';
 import { TopicIngestionModal } from '../components/TopicIngestionModal';
 import { BlackoutManagerModal } from '../components/BlackoutManagerModal';
 import { ConflictResolutionModal } from '../components/ConflictResolutionModal';
+import { MonthlyBulletinModal } from '../components/MonthlyBulletinModal';
+import { QuarterlyAnalyticsDashboard } from '../components/QuarterlyAnalyticsDashboard';
+import { CreateSessionModal } from '../components/CreateSessionModal';
+import { TrainingGlobalFilterBar } from '../components/TrainingGlobalFilterBar';
+import { TrainingQuickActionsFAB } from '../components/TrainingQuickActionsFAB';
+import { DailyOrdersPublisher } from '../components/DailyOrdersPublisher';
+import { TrainingAttendanceMuster } from '../components/TrainingAttendanceMuster';
 import { 
   Calendar, 
   Sliders, 
@@ -58,10 +65,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileSpreadsheet,
-  LayoutDashboard
+  LayoutDashboard,
+  FileText,
+  TrendingUp,
+  Plus,
+  UserCheck
 } from 'lucide-react';
 
-const READ_ONLY_TABS: ActiveTab[] = ['PUBLIC', 'DEPARTMENTS'];
+const READ_ONLY_TABS: ActiveTab[] = ['PUBLIC', 'DEPARTMENTS', 'QUARTERLY', 'MUSTER'];
 
 /** Training scheduler. With canEdit false only the calendar, ship dossier and department views are available. */
 export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEdit: boolean; isAdmin?: boolean; storageKey: string }) {
@@ -93,13 +104,35 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
 
   // Modal Dialog States
   const [isIngestionOpen, setIsIngestionOpen] = useState(false);
+  const [isCreateSessionOpen, setIsCreateSessionOpen] = useState(false);
+  const [isDailyOrdersOpen, setIsDailyOrdersOpen] = useState(false);
   const [isBlackoutOpen, setIsBlackoutOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeConflict, setActiveConflict] = useState<ScheduleConflict | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
+  const [isBulletinOpen, setIsBulletinOpen] = useState(false);
   const [rescheduling, setRescheduling] = useState<ScheduledSession | null>(null);
   const [pendingChange, setPendingChange] = useState<{ session: ScheduledSession; conflicts: ScheduleConflict[] } | null>(null);
+  const [filteredSessions, setFilteredSessions] = useState<ScheduledSession[] | null>(null);
+  const displaySessions = filteredSessions || sessions;
   const today = formatDate(new Date());
+
+  // Auto-load training curriculum and sessions from external asset file if both are empty (without embedding in code)
+  useEffect(() => {
+    if (topics.length === 0 && sessions.length === 0) {
+      fetch('/data/training_curriculum.json')
+        .then(res => (res.ok ? res.json() : null))
+        .then((data: { topics?: Topic[]; sessions?: ScheduledSession[] } | null) => {
+          if (data && Array.isArray(data.topics) && data.topics.length > 0) {
+            setTopics(data.topics);
+          }
+          if (data && Array.isArray(data.sessions) && data.sessions.length > 0) {
+            setSessions(data.sessions);
+          }
+        })
+        .catch(err => console.info('Note: external training_curriculum.json not loaded:', err));
+    }
+  }, [topics.length, sessions.length]);
 
   // File upload input ref for JSON restore
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -136,6 +169,13 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
     setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
   };
 
+  const handleCreateSessions = (newSessions: ScheduledSession[]) => {
+    setSessions(prev => {
+      const merged = [...prev, ...newSessions].sort((a, b) => a.date.localeCompare(b.date));
+      return merged.map((s, idx) => ({ ...s, sequenceNumber: idx + 1 }));
+    });
+  };
+
   // A date / time change that creates a new warning is held back: the administrator may override and save it, others may not.
   const requestChange = (next: ScheduledSession) => {
     const existing = new Set(conflicts.filter(c => c.sessionId === next.id).map(c => `${c.type}|${c.message}`));
@@ -146,10 +186,10 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   };
 
   // Move a session to a later date; the old date is kept in its history and the status becomes Rescheduled
-  const handleReschedule = (session: ScheduledSession, date: string, startTime: string, reason: string) => {
+  const handleReschedule = (session: ScheduledSession, date: string, startTime: string, reason: string, adminOverride?: boolean) => {
     const end = session.durationMinutes ? addMinutes(startTime, session.durationMinutes) ?? '' : '';
     setRescheduling(null);
-    requestChange({
+    const updated: ScheduledSession = {
       ...session,
       date,
       dayOfWeek: new Date(`${date}T12:00:00`).getDay(),
@@ -158,8 +198,14 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       endTime: end,
       status: 'Rescheduled',
       isCustomLocked: true,
+      adminOverride: adminOverride ?? session.adminOverride,
       rescheduledFrom: [...(session.rescheduledFrom || []), { at: new Date().toISOString(), from: session.date, to: date, reason }]
-    });
+    };
+    if (adminOverride) {
+      handleUpdateSession(updated);
+    } else {
+      requestChange(updated);
+    }
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -361,6 +407,18 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
             )}
 
             <button
+              onClick={() => setActiveTab('QUARTERLY')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                activeTab === 'QUARTERLY'
+                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Quarterly & Hours</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('DEPARTMENTS')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
                 activeTab === 'DEPARTMENTS'
@@ -397,6 +455,18 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
               <span>Calendar</span>
             </button>
 
+            <button
+              onClick={() => setActiveTab('MUSTER')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                activeTab === 'MUSTER'
+                  ? 'bg-emerald-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Attendance & Make-Up</span>
+            </button>
+
             {canEdit && (
             <button
               onClick={() => setActiveTab('ANALYTICS')}
@@ -414,6 +484,17 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
 
           {/* Zone 3: 1 Primary Action */}
           <div className="flex items-center gap-2 shrink-0">
+            {canEdit && (
+            <button
+              onClick={() => setIsCreateSessionOpen(true)}
+              title="Schedule a new session with daily, weekly, or bi-weekly repeat"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Schedule Session</span>
+            </button>
+            )}
+
             {canEdit && (
             <label className="flex items-center gap-1 text-xs text-slate-400">
               <span className="hidden lg:inline">Year</span>
@@ -448,6 +529,15 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
             >
               <Printer className="w-3.5 h-3.5 text-blue-400" />
               <span>Print / PDF</span>
+            </button>
+
+            <button
+              onClick={() => setIsBulletinOpen(true)}
+              title="Generate professional-looking PDF specifically formatted for ship bulletin boards"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm active:scale-95"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Bulletin PDF</span>
             </button>
 
             <button
@@ -491,10 +581,17 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
 
       {/* Main Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex-1 w-full space-y-6">
+        {/* Global Persistent Filter Bar for Topic, Department, and Date Range */}
+        <TrainingGlobalFilterBar
+          sessions={sessions}
+          onFilteredSessionsChange={setFilteredSessions}
+          year={year}
+        />
+
         {/* Main Landing Dashboard Front Page */}
         {activeTab === 'DASHBOARD' && (
           <MainDashboard
-            sessions={sessions}
+            sessions={displaySessions}
             topics={topics}
             blackoutDates={blackoutDates}
             conflicts={conflicts}
@@ -626,19 +723,28 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
           </>
         )}
 
-        {/* Tab: Departments Showcase Page (Image 3 Reference) */}
+        {/* Tab: Departments Showcase Page */}
         {activeTab === 'DEPARTMENTS' && (
           <DepartmentsShowcasePage
-            sessions={sessions}
+            sessions={displaySessions}
             topics={topics}
             onNavigateTab={(tab) => setActiveTab(tab)}
+          />
+        )}
+
+        {/* Secondary Dashboard Tab: Quarterly Training Hours & Completion Trend Dashboard */}
+        {activeTab === 'QUARTERLY' && (
+          <QuarterlyAnalyticsDashboard
+            sessions={displaySessions}
+            topics={topics}
+            year={year}
           />
         )}
 
         {/* Tab 1: Admin Matrix Table */}
         {activeTab === 'ADMIN' && (
           <AdminMatrixTable
-            sessions={sessions}
+            sessions={displaySessions}
             conflicts={conflicts}
             blackoutDates={blackoutDates}
             topics={topics}
@@ -651,6 +757,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
             onOpenConflictModal={(conflict) => setActiveConflict(conflict)}
             onOpenBlackoutManager={() => setIsBlackoutOpen(true)}
             onOpenIngestionModal={() => setIsIngestionOpen(true)}
+            onOpenCreateSession={() => setIsCreateSessionOpen(true)}
             today={today}
             isAdmin={isAdmin}
             onMoveSession={requestChange}
@@ -661,20 +768,46 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
         {/* Tab 2: Public Calendar & Agenda View */}
         {activeTab === 'PUBLIC' && (
           <PublicCalendarView
-            sessions={sessions}
+            sessions={displaySessions}
             topics={topics}
+            blackoutDates={blackoutDates}
+            isAdmin={isAdmin}
+            onUpdateSession={handleUpdateSession}
+            onReschedule={setRescheduling}
           />
         )}
 
         {/* Tab 3: Fairness & Analytics Audit */}
         {activeTab === 'ANALYTICS' && (
           <AnalyticsView
-            sessions={sessions}
+            sessions={displaySessions}
             topics={topics}
             conflicts={conflicts}
           />
         )}
+
+        {/* Tab 4: Digital Attendance Muster, Absentees & Make-Up Lectures */}
+        {activeTab === 'MUSTER' && (
+          <TrainingAttendanceMuster
+            sessions={displaySessions}
+            canEdit={canEdit}
+            onUpdateSession={handleUpdateSession}
+            onAddMakeUpSession={(mopUp) => handleCreateSessions([mopUp])}
+          />
+        )}
       </main>
+
+      {/* Floating Quick Actions Menu */}
+      <TrainingQuickActionsFAB
+        canEdit={canEdit}
+        isAdmin={isAdmin}
+        onOpenAddSession={() => setIsCreateSessionOpen(true)}
+        onOpenIngestion={() => setIsIngestionOpen(true)}
+        onOpenDailyOrders={() => setIsDailyOrdersOpen(true)}
+        onOpenBulletinPdf={() => setIsBulletinOpen(true)}
+        onOpenExportRange={() => setIsExportOpen(true)}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
 
       {/* Modal Dialogs */}
       <TopicIngestionModal
@@ -682,6 +815,16 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
         onClose={() => setIsIngestionOpen(false)}
         onImportTopics={handleImportTopics}
         currentTopics={topics}
+      />
+
+      <CreateSessionModal
+        isOpen={isCreateSessionOpen}
+        onClose={() => setIsCreateSessionOpen(false)}
+        topics={topics}
+        blackoutDates={blackoutDates}
+        existingSessions={sessions}
+        onAddSessions={handleCreateSessions}
+        defaultStartTime={settings.startTime || '09:00'}
       />
 
       <BlackoutManagerModal
@@ -705,9 +848,35 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
 
       {isExportOpen && <ExportCalendarModal sessions={sessions} year={year} shipName={ship.name} today={today} onClose={() => setIsExportOpen(false)} />}
 
+      {isBulletinOpen && (
+        <MonthlyBulletinModal
+          isOpen={isBulletinOpen}
+          onClose={() => setIsBulletinOpen(false)}
+          sessions={sessions}
+          holidays={blackoutDates}
+          shipName={ship.name}
+          shipPennant={ship.pennant}
+          initialMonthDate={new Date(year, new Date().getMonth(), 1)}
+          settings={settings}
+        />
+      )}
+
+      {isDailyOrdersOpen && (
+        <DailyOrdersPublisher
+          sessionsOverride={sessions}
+          onClose={() => setIsDailyOrdersOpen(false)}
+        />
+      )}
+
       {rescheduling && (
-        <RescheduleModal session={rescheduling} today={today} onCancel={() => setRescheduling(null)}
-          onApply={(date, start, reason) => handleReschedule(rescheduling, date, start, reason)} />
+        <RescheduleModal
+          session={rescheduling}
+          today={today}
+          sessions={sessions}
+          isAdmin={isAdmin}
+          onCancel={() => setRescheduling(null)}
+          onApply={(date, start, reason, adminOverride) => handleReschedule(rescheduling, date, start, reason, adminOverride)}
+        />
       )}
 
       {pendingChange && (

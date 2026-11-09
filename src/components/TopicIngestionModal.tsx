@@ -111,12 +111,22 @@ export const TopicIngestionModal: React.FC<TopicIngestionModalProps> = ({
               Department is one of {ALL_TRACK_DEPARTMENTS.join(', ')}. Other columns: {fields.filter(f => !f.required).map(f => f.label).join(', ')} (a prerequisite is a topic ID or its exact title).
             </span>
           </div>
-          <button
-            onClick={downloadTemplate}
-            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold shrink-0 transition-colors"
-          >
-            Download Template
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={downloadTemplate}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg font-medium text-xs transition-colors"
+            >
+              CSV Template
+            </button>
+            <a
+              href="/templates/Training_Schedule_Template.xlsx"
+              download="Training_Schedule_Template.xlsx"
+              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-colors shadow-xs"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>Excel (.xlsx)</span>
+            </a>
+          </div>
         </div>
 
         <div className="space-y-1.5">

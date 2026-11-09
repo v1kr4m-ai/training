@@ -51,7 +51,7 @@ export function applyMapping(t: Table, fields: FieldDef[], m: Mapping): string {
 }
 
 // Self-check: node --experimental-strip-types src/utils/columnMap.ts
-if (typeof process !== 'undefined' && process.argv[1]?.endsWith('columnMap.ts')) {
+if (typeof process !== 'undefined' && Array.isArray(process?.argv) && process.argv[1]?.endsWith('columnMap.ts')) {
   const ok = (c: boolean, msg: string) => { if (!c) { console.error('FAIL', msg); process.exit(1); } };
   const fields: FieldDef[] = [{ key: 'title', label: 'Title', aliases: ['topic'] }, { key: 'department', label: 'Department' }, { key: 'venue', label: 'Venue' }];
   const t = readTable('Dept;Topic;Room\nEngineering;"Fire, drill";Hangar')!;

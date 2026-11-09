@@ -72,7 +72,7 @@ export function parsePersonnelTable(
 }
 
 // Self-check: node --experimental-strip-types src/portal/personnelImport.ts
-if (typeof process !== 'undefined' && process.argv[1]?.endsWith('personnelImport.ts')) {
+if (typeof process !== 'undefined' && Array.isArray(process?.argv) && process.argv[1]?.endsWith('personnelImport.ts')) {
   const ok = (c: boolean, m: string) => { if (!c) { console.error('FAIL', m); process.exit(1); } };
   let k = 0;
   const r = parsePersonnelTable(

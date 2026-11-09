@@ -1,4 +1,6 @@
 {
   "name": "Ship Administration Portal",
-  "description": "Offline training planner for INS Tushil: places topics on working days (13:45-14:45), ship-wide Mon/Thu and departmental Tue/Wed/Fri, resolves prerequisites, rotates departments fairly, and exports CSV, iCalendar and print."
+  "description": "Offline training planner for INS Tushil: places topics on working days (13:45-14:45), ship-wide Mon/Thu and departmental Tue/Wed/Fri, resolves prerequisites, rotates departments fairly, and exports CSV, iCalendar and print.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
