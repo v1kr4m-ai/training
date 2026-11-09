@@ -111,11 +111,67 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   const [activeConflict, setActiveConflict] = useState<ScheduleConflict | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isBulletinOpen, setIsBulletinOpen] = useState(false);
+  const [isOfflineGuideOpen, setIsOfflineGuideOpen] = useState(false);
   const [rescheduling, setRescheduling] = useState<ScheduledSession | null>(null);
   const [pendingChange, setPendingChange] = useState<{ session: ScheduledSession; conflicts: ScheduleConflict[] } | null>(null);
   const [filteredSessions, setFilteredSessions] = useState<ScheduledSession[] | null>(null);
   const displaySessions = filteredSessions || sessions;
   const today = formatDate(new Date());
+
+  // Unsaved / Unexported Local Changes Tracking (alerts users to export or sync before closing browser)
+  const SYNC_META_KEY = `${STORAGE_KEY}_sync_meta`;
+  const savedSyncMeta = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem(SYNC_META_KEY) || 'null') as {
+        unsavedCount?: number;
+        lastChangeLabel?: string;
+        lastModifiedAt?: string;
+        lastExportedAt?: string;
+      } | null;
+    } catch {
+      return null;
+    }
+  }, [SYNC_META_KEY]);
+
+  const [unsavedCount, setUnsavedCount] = useState<number>(() => savedSyncMeta?.unsavedCount || 0);
+  const [lastChangeLabel, setLastChangeLabel] = useState<string>(() => savedSyncMeta?.lastChangeLabel || '');
+  const [lastModifiedAt, setLastModifiedAt] = useState<string>(() => savedSyncMeta?.lastModifiedAt || '');
+  const [lastExportedAt, setLastExportedAt] = useState<string>(() => savedSyncMeta?.lastExportedAt || '');
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SYNC_META_KEY,
+        JSON.stringify({ unsavedCount, lastChangeLabel, lastModifiedAt, lastExportedAt })
+      );
+    } catch {
+      // ignore storage errors
+    }
+  }, [SYNC_META_KEY, unsavedCount, lastChangeLabel, lastModifiedAt, lastExportedAt]);
+
+  // Warn user before closing tab/browser if there are unexported local changes
+  useEffect(() => {
+    if (unsavedCount <= 0) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved/unexported local changes to the training plan. Export a JSON backup or sync before closing.';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [unsavedCount]);
+
+  const markLocalChange = (label: string) => {
+    setUnsavedCount(prev => prev + 1);
+    setLastChangeLabel(label);
+    setLastModifiedAt(new Date().toISOString());
+    window.dispatchEvent(new CustomEvent('tushil:data-updated'));
+  };
+
+  const markChangesSynced = () => {
+    setUnsavedCount(0);
+    setLastChangeLabel('');
+    setLastExportedAt(new Date().toISOString());
+  };
 
   // Auto-load training curriculum and sessions from external asset file if both are empty (without embedding in code)
   useEffect(() => {
@@ -167,6 +223,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   // Handlers for Session Modifications
   const handleUpdateSession = (updatedSession: ScheduledSession) => {
     setSessions(prev => prev.map(s => s.id === updatedSession.id ? updatedSession : s));
+    markLocalChange(`Updated session "${updatedSession.title}"`);
   };
 
   const handleCreateSessions = (newSessions: ScheduledSession[]) => {
@@ -174,6 +231,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       const merged = [...prev, ...newSessions].sort((a, b) => a.date.localeCompare(b.date));
       return merged.map((s, idx) => ({ ...s, sequenceNumber: idx + 1 }));
     });
+    markLocalChange(`Added ${newSessions.length} session${newSessions.length === 1 ? '' : 's'}`);
   };
 
   // A date / time change that creates a new warning is held back: the administrator may override and save it, others may not.
@@ -210,11 +268,13 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
 
   const handleDeleteSession = (sessionId: string) => {
     setSessions(prev => prev.filter(s => s.id !== sessionId).map((s, i) => ({ ...s, sequenceNumber: i + 1 })));
+    markLocalChange('Deleted session');
   };
 
   // Fill free slots with topics that have no session yet. Locked and completed sessions stay where they are.
   const handleAutoSchedule = () => {
     setSessions(generateFullSchedule(year, topics, blackoutDates, sessions, settings));
+    markLocalChange('Auto-scheduled training slots');
   };
 
   const workingSlots = useMemo(() => generateAnnualWorkingSlots(year, blackoutDates, settings).length, [year, blackoutDates, settings]);
@@ -224,12 +284,14 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   const handleCascadeReschedule = (fromSequence: number = 1) => {
     const recalculated = cascadeReschedule(sessions, blackoutDates, topics, fromSequence, settings);
     setSessions(recalculated);
+    markLocalChange('Cascade rescheduled sessions');
   };
 
   // Conflict Resolution Action: Shift 1 Working Day
   const handleShiftOneDay = (sessionId: string) => {
     const shifted = shiftSessionByOneWorkingDay(sessionId, sessions, blackoutDates, settings);
     setSessions(shifted);
+    markLocalChange('Shifted session by 1 working day');
   };
 
   // Clear prerequisite for standalone
@@ -240,6 +302,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       }
       return s;
     }));
+    markLocalChange('Cleared session prerequisite');
   };
 
   // Toggle lock
@@ -250,6 +313,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       }
       return s;
     }));
+    markLocalChange(`Toggled lock on "${session.title}"`);
   };
 
   // Blackout date management
@@ -259,10 +323,12 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       if (exists) return prev;
       return [...prev, entry].sort((a, b) => a.date.localeCompare(b.date));
     });
+    markLocalChange(`Added blackout date (${entry.date})`);
   };
 
   const handleRemoveBlackout = (dateStr: string) => {
     setBlackoutDates(prev => prev.filter(h => h.date !== dateStr));
+    markLocalChange(`Removed blackout date (${dateStr})`);
   };
 
   // Topic Ingestion
@@ -278,6 +344,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
     setTopics(mergedTopics);
     const freshSessions = generateFullSchedule(year, mergedTopics, blackoutDates, sessions, settings);
     setSessions(freshSessions);
+    markLocalChange(`Imported ${newTopics.length} curriculum topics (${mode})`);
   };
 
   // Switch the schedule year: add that year's default holidays, rebuild the schedule from the topics.
@@ -290,12 +357,14 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
     setYear(next);
     setBlackoutDates(holidays);
     setSessions(generateFullSchedule(next, topics, holidays, undefined, settings));
+    markLocalChange(`Changed schedule year to ${next}`);
   };
 
   // New training days / time of day: rebuild around locked and completed sessions
   const handleApplySettings = (next: ScheduleSettings) => {
     setSettings(next);
     setSessions(generateFullSchedule(year, topics, blackoutDates, sessions, next));
+    markLocalChange('Updated training schedule settings');
   };
 
   // Clear everything
@@ -305,6 +374,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       setBlackoutDates(defaultHolidays(year));
       setSessions([]);
       localStorage.removeItem(STORAGE_KEY);
+      markChangesSynced();
     }
   };
 
@@ -312,12 +382,14 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   const handleExportCsv = () => {
     const csv = generateCsvContent(sessions);
     downloadBlob(csv, `annual_training_matrix_${year}.csv`, 'text/csv;charset=utf-8');
+    markChangesSynced();
   };
 
   // Export iCalendar .ics for all sessions
   const handleExportAllIcs = () => {
     const ics = generateIcsContent(sessions, undefined, ship.name);
     downloadBlob(ics, `annual_training_matrix_full_${year}.ics`, 'text/calendar;charset=utf-8');
+    markChangesSynced();
   };
 
   // Backup JSON State
@@ -336,6 +408,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       `annual_training_matrix_backup_${year}_${new Date().toISOString().split('T')[0]}.json`,
       'application/json;charset=utf-8'
     );
+    markChangesSynced();
   };
 
   // Restore JSON State from file
@@ -557,9 +630,115 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
               <Download className="w-3.5 h-3.5" />
               <span>Export CSV</span>
             </button>
+
+            <a
+              href="/tushil-training-offline.html"
+              download="tushil-training-offline.html"
+              title="Download the entire Training Module as a single self-contained HTML file that runs 100% offline on any PC"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-500/40 transition-colors shadow-sm active:scale-95"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Offline HTML</span>
+            </a>
           </div>
         </div>
       </header>
+
+      {/* =========================================================================
+          UNSAVED LOCAL CHANGES STATUS BAR & STANDALONE OFFLINE HTML DOWNLOAD BAR
+         ========================================================================= */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 no-print">
+        <div
+          className={`rounded-2xl border px-4 py-3 flex flex-col lg:flex-row lg:items-center justify-between gap-3 transition-all ${
+            unsavedCount > 0
+              ? 'bg-amber-950/40 border-amber-500/60 shadow-lg shadow-amber-950/20'
+              : 'bg-slate-900/90 border-slate-800'
+          }`}
+        >
+          {/* Left: Visual Status Indicator for Unsaved / Unexported Local Changes */}
+          <div className="flex items-start sm:items-center gap-3">
+            {unsavedCount > 0 ? (
+              <span className="relative flex h-3 w-3 mt-1 sm:mt-0 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+              </span>
+            ) : (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+            )}
+
+            <div>
+              {unsavedCount > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-amber-300">
+                    Unsaved Local Changes ({unsavedCount} {unsavedCount === 1 ? 'edit' : 'edits'} pending backup/sync)
+                  </span>
+                  <span className="text-[11px] text-amber-200/80">
+                    — Stored only in this browser. Export a JSON/CSV backup or sync before closing the browser!
+                  </span>
+                  {lastChangeLabel && (
+                    <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/30 text-[10px] font-mono text-amber-200">
+                      Last: {lastChangeLabel}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-emerald-300">
+                    All Training Plan Changes Backed Up / Synced
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {lastExportedAt
+                      ? `· Last exported/synced at ${new Date(lastExportedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : '· Local storage active (no pending unbacked-up edits)'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Action Buttons (Backup Now, Download Offline Single-File HTML, Offline Guide) */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {unsavedCount > 0 && (
+              <>
+                <button
+                  onClick={handleBackupJson}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors shadow-sm"
+                  title="Download a JSON backup of the training plan and clear the unsaved warning"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Save Backup (.JSON)</span>
+                </button>
+                <button
+                  onClick={markChangesSynced}
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+                  title="Acknowledge that local changes are synced in this browser"
+                >
+                  Mark Synced
+                </button>
+              </>
+            )}
+
+            <a
+              href="/tushil-training-offline.html"
+              download="tushil-training-offline.html"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
+              title="Download the entire Training Module in a single standalone HTML file to share via USB or run offline on any PC"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download Offline Training (.HTML)</span>
+            </a>
+
+            <button
+              onClick={() => setIsOfflineGuideOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+              title="Read the Offline & PWA Operations Guide (OfflineGuide.md)"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              <span>Offline Guide</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Print-Only Executive Header */}
       <div className="hidden print-only mb-6 pb-4 border-b-2 border-slate-900">
@@ -896,6 +1075,67 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
         onClose={() => setIsSettingsOpen(false)}
         onApply={handleApplySettings}
       />
+
+      {/* Offline & PWA Operations Guide Modal (OfflineGuide.md) */}
+      {isOfflineGuideOpen && (
+        <div className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 no-print">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-950/60">
+              <div>
+                <h2 className="text-base font-bold text-white">Offline &amp; PWA Operations Guide (OfflineGuide.md)</h2>
+                <p className="text-xs text-slate-400">How to download, share, and run the Training Module and core portal offline</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href="/tushil-training-offline.html"
+                  download="tushil-training-offline.html"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Offline .HTML</span>
+                </a>
+                <button
+                  onClick={() => setIsOfflineGuideOpen(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
+              <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-700/40 space-y-1.5">
+                <h3 className="text-sm font-bold text-emerald-300">1. Share &amp; Run the Single-File Training Module (`tushil-training-offline.html`)</h3>
+                <p>
+                  Click <strong>Download Offline Training (.HTML)</strong> above to save <code className="text-emerald-200 font-mono">tushil-training-offline.html</code> (~2.8 MB).
+                  You can copy this single file onto a USB thumb drive or share it over LAN/email. Double-clicking it on any Windows, Linux, or Mac PC opens the complete Training Module offline in Chrome, Edge, or Firefox (<code className="font-mono">file://</code>) without Node.js or internet access.
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-700/40 space-y-1.5">
+                <h3 className="text-sm font-bold text-blue-300">2. Install the Full TUSHIL Portal as an Offline PWA</h3>
+                <p>
+                  To run all modules (<strong>Home, Executive · Gunnery &amp; Routine Office, Watch &amp; Station Bill, Daily Orders, Nominal Roll, Leave Forecast, Training, Settings</strong>) offline:
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Click the <strong>Install App</strong> button in the top navigation bar (or the install icon in your Chrome/Edge address bar).</li>
+                  <li>Once installed, the Service Worker pre-caches all assets so you can launch TUSHIL directly from your Desktop or Start Menu with zero network connectivity.</li>
+                </ul>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-700/40 space-y-1.5">
+                <h3 className="text-sm font-bold text-amber-300">3. Unsaved Local Changes &amp; Multi-PC USB / LAN Sync</h3>
+                <p>
+                  Whenever you edit sessions, topics, or settings, the <strong>Unsaved Local Changes Indicator</strong> alerts you that those edits exist only in your current browser until you export a backup.
+                </p>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Click <strong>Save Backup (.JSON)</strong> in the status banner (or <strong>Backup JSON</strong> in the standalone file) before closing your browser or moving to another PC.</li>
+                  <li>To sync the entire ship database across Bridge, EXO, and Gunnery Office PCs, use the <strong>Multi-PC LAN &amp; Thumb-Drive Sync</strong> button in the top bar.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
     </SettingsContext.Provider>
   );

@@ -45,7 +45,7 @@ interface DepartmentalSyncPacket {
 }
 
 export const LanSyncManager: React.FC = () => {
-  const { db, ship, shipId, user, update } = usePortal();
+  const { db, ship, shipId, user, update, hasPendingLanSync, pendingLanSyncCount, lastLanSyncAt, markLanSynced } = usePortal();
   const isOnline = useOnlineStatus();
   const [selectedDept, setSelectedDept] = useState<string>('ALL');
   const [mergeSummary, setMergeSummary] = useState<string[] | null>(null);
@@ -94,6 +94,7 @@ export const LanSyncManager: React.FC = () => {
       `${ship.name.replace(/\s+/g, '_')}_LAN_SYNC_${deptSlug}_${dateSlug}.json`,
       'application/json;charset=utf-8'
     );
+    markLanSynced();
   };
 
   const handleImportAndMergePacket = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,6 +234,7 @@ export const LanSyncManager: React.FC = () => {
           `${addedOrUpdatedWatchbill} Watch & Station Bill assignment(s) merged`,
           `${mergedTrainingMusters} Training Session & Attendance Muster(s) merged`
         ]);
+        markLanSynced();
       } catch (err) {
         console.error(err);
         setMergeError('Could not parse the selected JSON sync file.');
@@ -251,6 +253,44 @@ export const LanSyncManager: React.FC = () => {
         accept=".json"
         className="hidden"
       />
+
+      {/* Pending Data Update Detection Banner */}
+      <div
+        className={`p-3.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 ${
+          hasPendingLanSync
+            ? 'bg-emerald-950/35 border-emerald-500/50 text-emerald-200'
+            : 'bg-slate-900/70 border-slate-800 text-slate-300'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 text-xs">
+          {hasPendingLanSync ? (
+            <>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
+              <span>
+                <strong>{pendingLanSyncCount} new local data update{pendingLanSyncCount === 1 ? '' : 's'} detected</strong> — Export a LAN Sync packet below to synchronize other shipboard PCs.
+              </span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>
+                All local changes marked synchronized{lastLanSyncAt ? ` · Last synced at ${new Date(lastLanSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}.
+              </span>
+            </>
+          )}
+        </div>
+        {hasPendingLanSync && (
+          <button
+            onClick={markLanSynced}
+            className="px-3 py-1 rounded-lg text-[11px] font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+          >
+            Dismiss Pulse / Mark Synced
+          </button>
+        )}
+      </div>
 
       {/* Top Sea/Harbour Mode & PWA Status Banner */}
       <div className="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-wrap items-center justify-between gap-4">

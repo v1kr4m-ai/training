@@ -38,6 +38,11 @@ interface Store {
   setShowGunneryOnHome: (show: boolean) => void;
   customHeaders: Record<string, string>;
   setCustomHeader: (key: string, value: string) => void;
+  hasPendingLanSync: boolean;
+  pendingLanSyncCount: number;
+  lastLanSyncAt: string | null;
+  markLanSynced: () => void;
+  notifyLanDataChanged: () => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -116,22 +121,62 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
     try { localStorage.setItem('custom_headers', JSON.stringify(customHeaders)); } catch (e) { console.error('Could not save custom headers', e); }
   }, [customHeaders]);
 
+  const LAN_SYNC_KEY = `tushil_lan_sync_state_${ref.id}`;
+  const [lanSyncMeta, setLanSyncMeta] = useState<{ pendingCount: number; lastSyncedAt: string | null }>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LAN_SYNC_KEY) || 'null');
+      return {
+        pendingCount: typeof parsed?.pendingCount === 'number' ? parsed.pendingCount : 1,
+        lastSyncedAt: parsed?.lastSyncedAt || null,
+      };
+    } catch {
+      return { pendingCount: 1, lastSyncedAt: null };
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LAN_SYNC_KEY, JSON.stringify(lanSyncMeta));
+    } catch {
+      // ignore storage errors
+    }
+  }, [LAN_SYNC_KEY, lanSyncMeta]);
+
+  const notifyLanDataChanged = useCallback(() => {
+    setLanSyncMeta(prev => ({ ...prev, pendingCount: prev.pendingCount + 1 }));
+  }, []);
+
+  const markLanSynced = useCallback(() => {
+    setLanSyncMeta({ pendingCount: 0, lastSyncedAt: new Date().toISOString() });
+  }, []);
+
+  useEffect(() => {
+    const onCustomChange = () => notifyLanDataChanged();
+    window.addEventListener('tushil:data-updated', onCustomChange);
+    return () => window.removeEventListener('tushil:data-updated', onCustomChange);
+  }, [notifyLanDataChanged]);
+
   // the department list is shared by every module, so it is rewritten before anything below renders
   useMemo(() => applyDepartments(db.departments), [db.departments]);
 
   const user = useMemo(() => db.users.find(u => u.id === userId && u.active) || null, [db.users, userId]);
   const me = useMemo(() => db.personnel.find(p => p.id === user?.personId) || null, [db.personnel, user]);
 
-  const update = useCallback((fn: (d: Db) => Db) => setDb(fn), []);
+  const update = useCallback((fn: (d: Db) => Db) => {
+    setDb(fn);
+    setLanSyncMeta(prev => ({ ...prev, pendingCount: prev.pendingCount + 1 }));
+  }, []);
   const updateShip = (p: ShipProfile) => {
     setDb(d => ({ ...d, ship: p }));
     renameShip(ref.id, p.name.trim() || ref.name, p.pennant.trim());
+    setLanSyncMeta(prev => ({ ...prev, pendingCount: prev.pendingCount + 1 }));
   };
 
   // a restored backup may carry a different ship profile: keep the ship list in step with it
   const replaceDb = (d: Db) => {
     setDb(d);
     renameShip(ref.id, d.ship.name.trim() || ref.name, d.ship.pennant.trim());
+    setLanSyncMeta(prev => ({ ...prev, pendingCount: prev.pendingCount + 1 }));
   };
 
   const signIn = (id: string) => {
@@ -171,7 +216,35 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
   }, []);
 
   return (
-    <Ctx.Provider value={{ db, shipId: ref.id, ship: db.ship, updateShip, update, user, me, setupAdmin, login, logout, subDepartments, replaceDb, navPosition, setNavPosition, pinNavBar, setPinNavBar, showGunneryOnHome, setShowGunneryOnHome, customHeaders, setCustomHeader }}>
+    <Ctx.Provider
+      value={{
+        db,
+        shipId: ref.id,
+        ship: db.ship,
+        updateShip,
+        update,
+        user,
+        me,
+        setupAdmin,
+        login,
+        logout,
+        subDepartments,
+        replaceDb,
+        navPosition,
+        setNavPosition,
+        pinNavBar,
+        setPinNavBar,
+        showGunneryOnHome,
+        setShowGunneryOnHome,
+        customHeaders,
+        setCustomHeader,
+        hasPendingLanSync: lanSyncMeta.pendingCount > 0,
+        pendingLanSyncCount: lanSyncMeta.pendingCount,
+        lastLanSyncAt: lanSyncMeta.lastSyncedAt,
+        markLanSynced,
+        notifyLanDataChanged,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

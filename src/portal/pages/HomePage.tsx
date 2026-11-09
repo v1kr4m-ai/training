@@ -4,7 +4,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, CalendarDays, Newspaper, Pencil, Clock, CheckCircle2, Layers, Anchor, FileText } from 'lucide-react';
+import { ArrowRight, CalendarDays, Newspaper, Pencil, Clock, CheckCircle2, Layers, Anchor, FileText, Download } from 'lucide-react';
 import { getDepartmentConfig } from '../../data/departments';
 import { todayIso } from '../leaveLogic';
 import { trainingKey } from '../registry';
@@ -114,6 +114,36 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
   const weekUpcoming = useMemo(() => weekSessions.filter(s => s.status === 'Scheduled').length, [weekSessions]);
   const shipWideWeek = useMemo(() => weekSessions.filter(s => s.trackType === 'COMPANY_WIDE').length, [weekSessions]);
   const deptWeek = useMemo(() => weekSessions.filter(s => s.trackType === 'DEPARTMENTAL').length, [weekSessions]);
+
+  // Daily Orders status summary for today (or latest active order)
+  const dailyOrdersList = useMemo(() => db.dailyOrders || [], [db.dailyOrders]);
+  const todayDailyOrder = useMemo(
+    () =>
+      dailyOrdersList.find(o => o.orderDate === todayStr && o.noticeBoardStatus === 'ACTIVE') ||
+      dailyOrdersList.find(o => o.orderDate === todayStr) ||
+      null,
+    [dailyOrdersList, todayStr]
+  );
+  const latestPublishedOrder = useMemo(
+    () =>
+      [...dailyOrdersList]
+        .filter(o => o.noticeBoardStatus === 'ACTIVE')
+        .sort((a, b) => b.orderDate.localeCompare(a.orderDate) || b.publishedAt.localeCompare(a.publishedAt))[0] ||
+      dailyOrdersList[0] ||
+      null,
+    [dailyOrdersList]
+  );
+  const displayOrder = todayDailyOrder || latestPublishedOrder;
+  const todayRoster = db.dutyRosters?.[todayStr] || null;
+  const todayTrainingCount = useMemo(
+    () => allSessions.filter(s => s.date === todayStr && s.status !== 'Cancelled').length,
+    [allSessions, todayStr]
+  );
+  const personNameById = (id?: string) => {
+    if (!id) return null;
+    const p = db.personnel.find(x => x.id === id);
+    return p ? `${p.rank} ${p.name}` : null;
+  };
 
   return (
     <div className="space-y-6">
@@ -274,6 +304,105 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
         </section>
       )}
 
+      {/* Daily Orders Card — Current Date Status Summary & Quick Link */}
+      <section className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <FileText className="w-4 h-4" />
+              </div>
+              <h2 className="text-base font-bold text-white tracking-tight">
+                Daily Orders Part I — Current Date Status Summary
+              </h2>
+              {todayDailyOrder ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  PUBLISHED FOR TODAY ({todayStr})
+                </span>
+              ) : displayOrder ? (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                  ACTIVE NOTICE BOARD ({displayOrder.orderDate})
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  AWAITING TODAY&apos;S PUBLICATION ({todayStr})
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400">
+              {displayOrder
+                ? `${displayOrder.serialNo} · ${displayOrder.routineState} · Published by ${displayOrder.publishedBy}`
+                : `No Daily Order Part I published yet for ${todayStr}. Use the Daily Orders generator to pull training & duty watch tables.`}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              onClick={() => go('daily-orders')}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm active:scale-95"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Open Daily Orders View</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Status Summary Grid for Today's Order / Routine */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="text-[11px] text-slate-400 font-medium">Order Status &amp; Dress</div>
+            <div className="text-sm font-bold text-white mt-1 truncate">
+              {displayOrder ? displayOrder.routineState : todayRoster ? `${todayRoster.mode} Routine` : 'Harbour / Sea Routine'}
+            </div>
+            <div className="text-[11px] text-emerald-400 font-mono mt-1 truncate">
+              {displayOrder?.dressOfTheDay || 'Dress: No. 8A / Working Rig'}
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="text-[11px] text-slate-400 font-medium">Officer of the Day (OOD)</div>
+            <div className="text-sm font-bold text-white mt-1 truncate">
+              {displayOrder?.duties?.officerOfTheDay ||
+                personNameById(todayRoster?.officerOfTheDayId) ||
+                'Not Assigned Yet'}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1 truncate">
+              QM: {displayOrder?.duties?.quartermaster || personNameById(todayRoster?.quartermasterId) || 'Pending'}
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="text-[11px] text-slate-400 font-medium">Daily Routine Evolutions</div>
+            <div className="text-xl font-black font-mono text-blue-400 mt-1">
+              {displayOrder ? displayOrder.routines.length : 0}{' '}
+              <span className="text-xs font-normal text-slate-400">timed evolutions</span>
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+              {displayOrder?.routines?.[0]
+                ? `First: ${displayOrder.routines[0].time} ${displayOrder.routines[0].evolution}`
+                : 'Standard shipboard routine template ready'}
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-950/80 rounded-2xl border border-slate-800">
+            <div className="text-[11px] text-slate-400 font-medium">Training Lectures Included</div>
+            <div className="text-xl font-black font-mono text-amber-400 mt-1">
+              {displayOrder ? displayOrder.trainingSessions.length : todayTrainingCount}{' '}
+              <span className="text-xs font-normal text-slate-400">
+                {displayOrder ? 'in order' : 'scheduled today'}
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5 truncate">
+              {dailyOrdersList.filter(o => o.noticeBoardStatus === 'ACTIVE').length} active notice board entry(s)
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Weekly Training Schedule Summary Section (Compact Grid Layout) */}
       <section className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
@@ -296,13 +425,25 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
             </p>
           </div>
 
-          <button
-            onClick={() => go('training')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm self-start sm:self-auto active:scale-95"
-          >
-            <span>Open Training Planner</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            <a
+              href="/tushil-training-offline.html"
+              download="tushil-training-offline.html"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm active:scale-95"
+              title="Download the entire Training Module in a single offline HTML file to share via USB or email"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download Offline Training (.HTML)</span>
+            </a>
+
+            <button
+              onClick={() => go('training')}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm active:scale-95"
+            >
+              <span>Open Training Planner</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* High-Level Weekly Metric Summary KPIs */}
