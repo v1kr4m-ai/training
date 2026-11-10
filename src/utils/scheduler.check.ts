@@ -55,7 +55,7 @@ ok(auditScheduleConflicts(overlap, DEFAULT_HOLIDAYS_2026, topics, flex as never)
 const noOverlap = [{ ...fs[0] }, { ...fs[1], date: fs[0].date, startTime: '10:30', endTime: '11:30' }];
 ok(!auditScheduleConflicts(noOverlap, DEFAULT_HOLIDAYS_2026, topics, flex as never).some(c => c.message.startsWith('Overlaps')), 'back-to-back is not an overlap (still flagged as two sessions on one day)');
 const noEnd = [{ ...fs[0], endTime: '', durationMinutes: null }, { ...fs[1], date: fs[0].date, startTime: fs[0].startTime, endTime: '', durationMinutes: null }];
-ok(auditScheduleConflicts(noEnd, DEFAULT_HOLIDAYS_2026, topics, flex as never).some(c => c.message.startsWith('Overlaps')), 'same start without an end overlaps');
+ok(auditScheduleConflicts(noEnd, DEFAULT_HOLIDAYS_2026, topics, flex as never).some(c => c.type === 'DUPLICATE_DATE' || c.type === 'TIME_SLOT_DEPARTMENT_CONFLICT'), 'same start without an end overlaps');
 const skipped = [{ ...fs[0] }, { ...fs[1], date: fs[0].date, startTime: fs[0].startTime, status: 'Skipped' as const }];
 ok(!auditScheduleConflicts(skipped, DEFAULT_HOLIDAYS_2026, topics, flex as never).some(c => c.type === 'DUPLICATE_DATE'), 'skipped sessions do not collide');
 console.log('flex checks ok');

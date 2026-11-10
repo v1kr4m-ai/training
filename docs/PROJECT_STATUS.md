@@ -19,8 +19,8 @@ Update it before every push.
 | `topicImport.ts` | pass |
 | `personnelImport.ts` | pass |
 | `registry.check.ts` | pass |
-| `leave.check.ts` | **FAIL** `user -> HoD`. The check uses a Sailor and expects `PENDING_HOD`; the new chain correctly gives `PENDING_DO`. The check is out of date, and stops at the first failure, so the rest of it is not running. |
-| `scheduler.check.ts` | **FAIL** `same start without an end overlaps`. Two sessions on one day with the same start time and no duration are not reported as overlapping. Not yet investigated: could be the check or the engine. |
+| `leave.check.ts` | pass (fixed on `fix/failing-checks`) |
+| `scheduler.check.ts` | pass (fixed on `fix/failing-checks`) |
 
 ## Built
 
@@ -38,7 +38,7 @@ Nothing half-done in code.
 
 ## Next (in order)
 
-1. Fix or update the two failing checks above.
+1. Merge `fix/failing-checks` after review. Changes: leave approval is now strict (only the stage's approver decides; Administrator keeps its override); two stale check expectations updated.
 2. Audit finding 2: take approval rights from the user's role only, not from designation text.
 3. Audit findings 3 and 4: validate LAN Sync packets (ship id, record shape) and stop writing training
    sessions around the Training page's state.

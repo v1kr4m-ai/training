@@ -137,16 +137,14 @@ export function canDecide(db: Db, user: User, req: LeaveRequest): boolean {
   }
 
   if (req.status === 'PENDING_EXO') {
-    return user.role === 'EXO' || user.role === 'CO' || userDesignation.includes('executive officer') || userDesignation.includes('exo');
+    return user.role === 'EXO' || userDesignation.includes('executive officer') || userDesignation.includes('exo');
   }
 
   if (req.status === 'PENDING_HOD') {
-    if (user.role === 'CO' || user.role === 'EXO') return true;
     return user.role === 'HOD' && !!applicant && !!me && me.department === applicant.department;
   }
 
   if (req.status === 'PENDING_DO') {
-    if (user.role === 'CO' || user.role === 'EXO' || user.role === 'HOD') return true;
     // Section Officer or Department Officer: Officer belonging to the same department
     return !!applicant && !!me && me.department === applicant.department && me.category === 'Officer';
   }

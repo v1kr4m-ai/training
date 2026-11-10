@@ -32,10 +32,10 @@ const db: Db = {
 };
 
 // approval routing
-ok(firstStatus(db, db.personnel[0]) === 'PENDING_HOD', 'user -> HoD');
+ok(firstStatus(db, db.personnel[0]) === 'PENDING_DO', 'sailor -> Department Officer');
 ok(firstStatus(db, db.personnel[2]) === 'PENDING_CO', 'HoD -> CO');
 ok(firstStatus(db, db.personnel[3]) === 'PENDING_ADMIN', 'CO -> admin');
-ok(firstStatus(db, db.personnel[4]) === 'PENDING_CO', 'department without HoD -> CO');
+ok(firstStatus(db, { ...db.personnel[4], category: 'Officer' }) === 'PENDING_CO', 'officer in department without HoD -> CO');
 ok(statusAfterApproval('PENDING_HOD') === 'PENDING_CO' && statusAfterApproval('PENDING_CO') === 'APPROVED', 'stage progression');
 
 const req = (over: Partial<LeaveRequest>): LeaveRequest => ({
