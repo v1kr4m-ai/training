@@ -37,7 +37,7 @@ Nothing half-done in code.
 
 ## Next (in order)
 
-1. Audit finding 2: take approval rights from the user's role only, not from designation text.
+1. Audit finding 2 is on branch `fix/approval-roles`: approval rights and leave routing now use the user's role only. Review, then merge.
 2. Audit findings 3 and 4: validate LAN Sync packets (ship id, record shape) and stop writing training
    sessions around the Training page's state.
 4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies,
