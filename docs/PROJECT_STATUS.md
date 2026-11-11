@@ -33,19 +33,16 @@ Update it before every push.
 
 ## In progress
 
-Nothing half-done in code.
+- `feat/training-topics` (from `main`): training data accessor (`fix/training-data-safety`), Topics tab (add, edit, delete, clear all). Sample curriculum loads on first start only, so Clear all stays cleared after a reload.
+- `feat/standalone-training` (separate, not for `main`): single-file training HTML. Stays on its own branch by owner decision.
 
 ## Next (in order)
 
-1. Merge `fix/training-data-safety` after review: training state is read and written through one accessor
-   (`src/training/trainingStorage.ts`); LAN Sync merge and department rename no longer overwrite an open
-   Training page (audit findings 4 and 9). Browser-tested: external change shows on the open page.
+1. Owner: decide about AI Studio's standalone files already on `main` (`src/standalone-training.tsx`, `scripts/build-offline-training.mjs`, `OfflineGuide.md`, the `build:offline-training` script, the root and `public/` HTML). Owner wants standalone off `main`.
 2. LAN Sync packet validation (audit finding 3): check ship id and record shape before merging.
-3. Standalone training HTML login (audit finding 5): needs an owner decision (see below).
-4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies,
-   bring `README.md` up to date.
-5. Training calendar improvements: week view, today highlight, instructor filter, mandatory-topic flag with
-   compliance per department, recurring sessions, venue clash check.
+3. Same first-start-only fix for the Nominal Roll sample: `store.tsx` reloads `nominal_roll.json` whenever the roster is empty, so clearing people brings the sample back.
+4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies, bring `README.md` up to date.
+5. Training calendar improvements: week view, today highlight, instructor filter, mandatory-topic flag with compliance per department, recurring sessions, venue clash check.
 6. Not built yet: Daily Manpower status and daily in/out, Maintenance Calendar.
 
 ## Decisions waiting for the owner
