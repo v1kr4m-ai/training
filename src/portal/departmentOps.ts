@@ -5,6 +5,7 @@
 
 import { DEPARTMENTS, defaultDeptEdits, type DeptEdit } from '../data/departments.ts';
 import { trainingKey } from './registry.ts';
+import { patchTraining, readTraining } from '../training/trainingStorage.ts';
 import type { Db } from './types.ts';
 
 const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -46,19 +47,16 @@ export function removeDepartment(d: Db, name: string): Db {
   return { ...d, departments: deptList(d).filter(e => e.name !== name), subDepartments: rest };
 }
 
-type Saved = { topics?: Array<{ department?: string }>; sessions?: Array<{ department?: string }> } & Record<string, unknown>;
-const readTraining = (shipId: string): Saved | null => {
-  try { return JSON.parse(localStorage.getItem(trainingKey(shipId)) || 'null'); } catch { return null; }
-};
-
 /** How many training topics of this ship use the department. */
 export const trainingUses = (shipId: string, dept: string): number =>
-  (readTraining(shipId)?.topics || []).filter(t => t.department === dept).length;
+  (readTraining(trainingKey(shipId))?.topics || []).filter(t => t.department === dept).length;
 
 /** Keep the training module's saved topics and sessions in step with a renamed department. */
 export function renameInTraining(shipId: string, from: string, to: string) {
-  const s = readTraining(shipId);
-  if (!s) return;
-  const fix = <T extends { department?: string }>(a?: T[]) => (Array.isArray(a) ? a.map(x => (x.department === from ? { ...x, department: to } : x)) : a);
-  try { localStorage.setItem(trainingKey(shipId), JSON.stringify({ ...s, topics: fix(s.topics), sessions: fix(s.sessions) })); } catch { /* storage full or blocked: topics keep the old name */ }
+  if (!readTraining(trainingKey(shipId))) return;
+  const fix = <T extends { department: string }>(a: T[]) => a.map(x => (x.department === from ? { ...x, department: to } : x));
+  patchTraining(trainingKey(shipId), s => ({
+    topics: s.topics && fix(s.topics),
+    sessions: s.sessions && fix(s.sessions)
+  }));
 }

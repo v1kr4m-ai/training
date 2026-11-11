@@ -8,6 +8,7 @@ import { ArrowRight, CalendarDays, Newspaper, Pencil, Clock, CheckCircle2, Layer
 import { getDepartmentConfig } from '../../data/departments';
 import { todayIso } from '../leaveLogic';
 import { trainingKey } from '../registry';
+import { readTraining } from '../../training/trainingStorage';
 import { shipTitle } from '../ship';
 import { heroOf } from '../shipImages';
 import { ShipProfileEditor } from '../ShipProfileEditor';
@@ -20,14 +21,14 @@ const glass = 'rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md';
 
 /** Next scheduled training session from this ship's saved training state, if any. */
 function nextTraining(shipId: string, today: string): ScheduledSession | null {
-  try {
-    const s = JSON.parse(localStorage.getItem(trainingKey(shipId)) || 'null');
-    const list: ScheduledSession[] = Array.isArray(s?.sessions) ? s.sessions : [];
-    return list.filter(x => x.status === 'Scheduled' && x.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
-  } catch {
-    return null;
-  }
+  const list = sessionsOf(shipId);
+  return list.filter(x => x.status === 'Scheduled' && x.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0] || null;
 }
+
+const sessionsOf = (shipId: string): ScheduledSession[] => {
+  const s = readTraining(trainingKey(shipId));
+  return Array.isArray(s?.sessions) ? s.sessions : [];
+};
 
 export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
   const { db, user, ship, shipId, showGunneryOnHome, setShowGunneryOnHome } = usePortal();
@@ -48,14 +49,7 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
   const first = user?.displayName.split(/\s+/)[0];
 
   // Full training sessions for this ship
-  const allSessions: ScheduledSession[] = useMemo(() => {
-    try {
-      const s = JSON.parse(localStorage.getItem(trainingKey(shipId)) || 'null');
-      return Array.isArray(s?.sessions) ? s.sessions : [];
-    } catch {
-      return [];
-    }
-  }, [shipId]);
+  const allSessions: ScheduledSession[] = useMemo(() => sessionsOf(shipId), [shipId]);
 
   const todayStr = todayIso();
   const todayDate = useMemo(() => new Date(`${todayStr}T12:00:00`), [todayStr]);
