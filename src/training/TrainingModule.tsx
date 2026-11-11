@@ -55,6 +55,8 @@ import { DailyOrdersPublisher } from '../components/DailyOrdersPublisher';
 import { TrainingAttendanceMuster } from '../components/TrainingAttendanceMuster';
 import { readTraining, TRAINING_CHANGED } from './trainingStorage';
 import { loadSeedJson } from '../utils/seedData';
+import { deleteTopicAndSessions, syncSessionsToTopic, upsertTopic } from './topicEdits';
+import { TopicManager } from '../components/TopicManager';
 import { 
   Calendar, 
   Sliders, 
@@ -71,7 +73,8 @@ import {
   FileText,
   TrendingUp,
   Plus,
-  UserCheck
+  UserCheck,
+  BookOpen
 } from 'lucide-react';
 
 const READ_ONLY_TABS: ActiveTab[] = ['PUBLIC', 'DEPARTMENTS', 'QUARTERLY', 'MUSTER'];
@@ -79,7 +82,7 @@ const READ_ONLY_TABS: ActiveTab[] = ['PUBLIC', 'DEPARTMENTS', 'QUARTERLY', 'MUST
 /** Training scheduler. With canEdit false only the calendar, ship dossier and department views are available. */
 export function TrainingModule({ canEdit, isAdmin = false, standalone = false, storageKey }: { canEdit: boolean; isAdmin?: boolean; standalone?: boolean; storageKey: string }) {
   const STORAGE_KEY = storageKey;
-  const { ship, customHeaders } = usePortal();
+  const { ship, customHeaders, subDepartments } = usePortal();
   const [activeTab, setActiveTabRaw] = useState<ActiveTab>(canEdit ? 'DASHBOARD' : 'PUBLIC');
   const setActiveTab = (t: ActiveTab) => setActiveTabRaw(canEdit || READ_ONLY_TABS.includes(t) ? t : 'PUBLIC');
 
@@ -166,9 +169,9 @@ export function TrainingModule({ canEdit, isAdmin = false, standalone = false, s
     setLastExportedAt(new Date().toISOString());
   };
 
-  // Auto-load training curriculum and sessions from external asset file if both are empty (without embedding in code)
+  // Sample curriculum loads on first start only. After that an empty plan stays empty (for example after Clear all topics).
   useEffect(() => {
-    if (topics.length === 0 && sessions.length === 0) {
+    if (saved === null && topics.length === 0 && sessions.length === 0) {
       loadSeedJson<{ topics?: Topic[]; sessions?: ScheduledSession[] }>('training_curriculum.json')
         .then(data => {
           if (data && Array.isArray(data.topics) && data.topics.length > 0) {
@@ -180,7 +183,7 @@ export function TrainingModule({ canEdit, isAdmin = false, standalone = false, s
         })
         .catch(err => console.info('Note: external training_curriculum.json not loaded:', err));
     }
-  }, [topics.length, sessions.length]);
+  }, []);
 
   // File upload input ref for JSON restore
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +275,36 @@ export function TrainingModule({ canEdit, isAdmin = false, standalone = false, s
     } else {
       requestChange(updated);
     }
+  };
+
+  // Topic library: a new topic is placed in free slots; an edit updates its open sessions; a delete also removes its planned sessions
+  const handleSaveTopic = (topic: Topic, isNew: boolean) => {
+    const nextTopics = upsertTopic(topics, topic);
+    setTopics(nextTopics);
+    if (isNew) {
+      setSessions(generateFullSchedule(year, nextTopics, blackoutDates, sessions, settings));
+      markLocalChange(`Added topic "${topic.title}"`);
+    } else {
+      setSessions(prev => syncSessionsToTopic(prev, topic));
+      markLocalChange(`Updated topic "${topic.title}"`);
+    }
+  };
+
+  const handleDeleteTopic = (id: string): string | null => {
+    const title = topics.find(t => t.id === id)?.title ?? id;
+    const result = deleteTopicAndSessions(topics, sessions, id);
+    if ('error' in result) return result.error;
+    setTopics(result.topics);
+    setSessions(generateFullSchedule(year, result.topics, blackoutDates, result.sessions, settings));
+    markLocalChange(`Deleted topic "${title}" (${result.removed} session(s))`);
+    return null;
+  };
+
+  const handleClearAllTopics = () => {
+    const removed = `${topics.length} topic(s) and ${sessions.length} session(s)`;
+    setTopics([]);
+    setSessions([]);
+    markLocalChange(`Cleared all topics (${removed})`);
   };
 
   const handleDeleteSession = (sessionId: string) => {
@@ -521,6 +554,20 @@ export function TrainingModule({ canEdit, isAdmin = false, standalone = false, s
             >
               <Sliders className="w-3.5 h-3.5" />
               <span>Training Matrix</span>
+            </button>
+            )}
+
+            {canEdit && (
+            <button
+              onClick={() => setActiveTab('TOPICS')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
+                activeTab === 'TOPICS'
+                  ? 'bg-blue-600 text-white font-semibold shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Topics</span>
             </button>
             )}
 
@@ -933,6 +980,17 @@ export function TrainingModule({ canEdit, isAdmin = false, standalone = false, s
         )}
 
         {/* Tab 1: Admin Matrix Table */}
+        {activeTab === 'TOPICS' && canEdit && (
+          <TopicManager
+            topics={topics}
+            sessions={sessions}
+            sectionsOf={dept => subDepartments(dept)}
+            onSave={handleSaveTopic}
+            onDelete={handleDeleteTopic}
+            onClearAll={handleClearAllTopics}
+          />
+        )}
+
         {activeTab === 'ADMIN' && (
           <AdminMatrixTable
             sessions={displaySessions}

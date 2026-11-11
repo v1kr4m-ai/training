@@ -142,4 +142,4 @@ export interface MatrixMetrics {
   starvationAlerts: Array<{ department: string; maxGapSessions: number }>;
 }
 
-export type ActiveTab = 'DASHBOARD' | 'QUARTERLY' | 'DEPARTMENTS' | 'ADMIN' | 'PUBLIC' | 'ANALYTICS' | 'MUSTER';
+export type ActiveTab = 'DASHBOARD' | 'QUARTERLY' | 'DEPARTMENTS' | 'ADMIN' | 'TOPICS' | 'PUBLIC' | 'ANALYTICS' | 'MUSTER';
