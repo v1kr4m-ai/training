@@ -6,12 +6,11 @@ Update it before every push.
 ## Last session
 
 - Date: 2026-11-10
-- Tool: Claude Code
-- Branch: `docs/agent-setup`
-- Done: pulled AI Studio commit `f16f058` into the local copy; read the whole codebase; wrote `AGENTS.md`,
-  `CLAUDE.md`, `docs/ARCHITECTURE.md` (with audit findings) and this file. No application code changed.
+- Tool: Google AI Studio
+- Branch: `main`
+- Done: pulled `b1557de` from `origin/main`; fast-forward merged `origin/fix/failing-checks` (`0b548d7`) into `main`; verified all 5 self-checks, `npm run lint`, and `npm run build` pass; pushed `main` to GitHub.
 
-## Check results (2026-11-10, at `f16f058`)
+## Check results (2026-11-10, at `0b548d7` on `main`)
 
 | Check | Result |
 |---|---|
@@ -19,8 +18,8 @@ Update it before every push.
 | `topicImport.ts` | pass |
 | `personnelImport.ts` | pass |
 | `registry.check.ts` | pass |
-| `leave.check.ts` | pass (fixed on `fix/failing-checks`) |
-| `scheduler.check.ts` | pass (fixed on `fix/failing-checks`) |
+| `leave.check.ts` | pass |
+| `scheduler.check.ts` | pass |
 
 ## Built
 
@@ -38,9 +37,8 @@ Nothing half-done in code.
 
 ## Next (in order)
 
-1. Merge `fix/failing-checks` after review. Changes: leave approval is now strict (only the stage's approver decides; Administrator keeps its override); two stale check expectations updated.
-2. Audit finding 2: take approval rights from the user's role only, not from designation text.
-3. Audit findings 3 and 4: validate LAN Sync packets (ship id, record shape) and stop writing training
+1. Audit finding 2: take approval rights from the user's role only, not from designation text.
+2. Audit findings 3 and 4: validate LAN Sync packets (ship id, record shape) and stop writing training
    sessions around the Training page's state.
 4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies,
    bring `README.md` up to date.
