@@ -106,7 +106,6 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   const [activeConflict, setActiveConflict] = useState<ScheduleConflict | null>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isBulletinOpen, setIsBulletinOpen] = useState(false);
-  const [isOfflineGuideOpen, setIsOfflineGuideOpen] = useState(false);
   const [rescheduling, setRescheduling] = useState<ScheduledSession | null>(null);
   const [pendingChange, setPendingChange] = useState<{ session: ScheduledSession; conflicts: ScheduleConflict[] } | null>(null);
   const [filteredSessions, setFilteredSessions] = useState<ScheduledSession[] | null>(null);
@@ -686,15 +685,6 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
               <span>Export CSV</span>
             </button>
 
-                        <a
-              href="/tushil-training-offline.html"
-              download="tushil-training-offline.html"
-              title="Download the entire Training Module as a single self-contained HTML file that runs 100% offline on any PC"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-500/40 transition-colors shadow-sm active:scale-95"
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>Offline HTML</span>
-            </a>
           </div>
         </div>
       </header>
@@ -751,7 +741,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
             </div>
           </div>
 
-          {/* Right: Action Buttons (Backup Now, Download Offline Single-File HTML, Offline Guide) */}
+          {/* Right: Action Buttons (Backup Now) */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             {unsavedCount > 0 && (
               <>
@@ -773,24 +763,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
               </>
             )}
 
-                        <a
-              href="/tushil-training-offline.html"
-              download="tushil-training-offline.html"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
-              title="Download the entire Training Module in a single standalone HTML file to share via USB or run offline on any PC"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Offline Training (.HTML)</span>
-            </a>
-
-            <button
-              onClick={() => setIsOfflineGuideOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
-              title="Read the Offline & PWA Operations Guide (OfflineGuide.md)"
-            >
-              <FileText className="w-3.5 h-3.5 text-blue-400" />
-              <span>Offline Guide</span>
-            </button>
+                
           </div>
         </div>
       </div>
@@ -1142,66 +1115,6 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
         onApply={handleApplySettings}
       />
 
-      {/* Offline & PWA Operations Guide Modal (OfflineGuide.md) */}
-      {isOfflineGuideOpen && (
-        <div className="fixed inset-0 z-[200] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 no-print">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-950/60">
-              <div>
-                <h2 className="text-base font-bold text-white">Offline &amp; PWA Operations Guide (OfflineGuide.md)</h2>
-                <p className="text-xs text-slate-400">How to download, share, and run the Training Module and core portal offline</p>
-              </div>
-              <div className="flex items-center gap-2">
-                                <a
-                  href="/tushil-training-offline.html"
-                  download="tushil-training-offline.html"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Offline .HTML</span>
-                </a>
-                <button
-                  onClick={() => setIsOfflineGuideOpen(false)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-            <div className="p-5 overflow-y-auto space-y-4 text-xs text-slate-300 leading-relaxed">
-              <div className="p-3.5 rounded-xl bg-emerald-950/30 border border-emerald-700/40 space-y-1.5">
-                <h3 className="text-sm font-bold text-emerald-300">1. Share &amp; Run the Single-File Training Module (`tushil-training-offline.html`)</h3>
-                <p>
-                  Click <strong>Download Offline Training (.HTML)</strong> above to save <code className="text-emerald-200 font-mono">tushil-training-offline.html</code> (~2.8 MB).
-                  You can copy this single file onto a USB thumb drive or share it over LAN/email. Double-clicking it on any Windows, Linux, or Mac PC opens the complete Training Module offline in Chrome, Edge, or Firefox (<code className="font-mono">file://</code>) without Node.js or internet access.
-                </p>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-700/40 space-y-1.5">
-                <h3 className="text-sm font-bold text-blue-300">2. Install the Full TUSHIL Portal as an Offline PWA</h3>
-                <p>
-                  To run all modules (<strong>Home, Executive · Gunnery &amp; Routine Office, Watch &amp; Station Bill, Daily Orders, Nominal Roll, Leave Forecast, Training, Settings</strong>) offline:
-                </p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Click the <strong>Install App</strong> button in the top navigation bar (or the install icon in your Chrome/Edge address bar).</li>
-                  <li>Once installed, the Service Worker pre-caches all assets so you can launch TUSHIL directly from your Desktop or Start Menu with zero network connectivity.</li>
-                </ul>
-              </div>
-
-              <div className="p-3.5 rounded-xl bg-amber-950/30 border border-amber-700/40 space-y-1.5">
-                <h3 className="text-sm font-bold text-amber-300">3. Unsaved Local Changes &amp; Multi-PC USB / LAN Sync</h3>
-                <p>
-                  Whenever you edit sessions, topics, or settings, the <strong>Unsaved Local Changes Indicator</strong> alerts you that those edits exist only in your current browser until you export a backup.
-                </p>
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Click <strong>Save Backup (.JSON)</strong> in the status banner (or <strong>Backup JSON</strong> in the standalone file) before closing your browser or moving to another PC.</li>
-                  <li>To sync the entire ship database across Bridge, EXO, and Gunnery Office PCs, use the <strong>Multi-PC LAN &amp; Thumb-Drive Sync</strong> button in the top bar.</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
     </SettingsContext.Provider>
   );

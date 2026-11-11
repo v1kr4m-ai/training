@@ -420,16 +420,6 @@ export const HomePage: React.FC<{ go: (p: string) => void }> = ({ go }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-            <a
-              href="/tushil-training-offline.html"
-              download="tushil-training-offline.html"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm active:scale-95"
-              title="Download the entire Training Module in a single offline HTML file to share via USB or email"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Offline Training (.HTML)</span>
-            </a>
-
             <button
               onClick={() => go('training')}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition-colors shadow-sm active:scale-95"

@@ -70,9 +70,12 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
     try { localStorage.setItem(DB, JSON.stringify(db)); } catch (e) { console.error('Could not save the portal data', e); }
   }, [db, DB]);
 
-  // Auto-load nominal roll from external asset file if empty (avoids embedding data in code)
+  // Sample nominal roll on first start only, so a roster the administrator cleared stays empty
+  const [isFirstStart] = useState(() => {
+    try { return localStorage.getItem(DB) === null; } catch { return false; }
+  });
   useEffect(() => {
-    if (db.personnel.length === 0) {
+    if (isFirstStart && db.personnel.length === 0) {
       fetch('/data/nominal_roll.json')
         .then(res => (res.ok ? res.json() : null))
         .then((data: Person[] | null) => {
@@ -82,7 +85,7 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
         })
         .catch(err => console.info('Note: external nominal_roll.json not loaded:', err));
     }
-  }, [db.personnel.length]);
+  }, []);
 
   const [navPosition, setNavPosition] = useState<'top' | 'side'>(() => {
     try { return (localStorage.getItem('nav_position' as string) as 'top' | 'side') || 'top'; } catch { return 'top'; }
