@@ -38,8 +38,7 @@ Do not wait until the last message to push. A session that dies mid-edit strands
    rosters, passwords, or anything else sensitive. `public/data/*.json` must contain invented sample data only.
 2. **No network calls at runtime.** The portal must work air-gapped. No CDN links, no remote fonts, no APIs.
    The only `fetch` calls allowed are for the app's own files under `public/`.
-3. **Do not hand-edit generated files.** `tushil-training-offline.html` (root and `public/`) is produced by
-   `npm run build:offline-training`. Change the source, then rebuild.
+3. **Keep generated files out of git.** Build output (`dist/`) is ignored; do not commit it.
 4. **Keep changes scoped.** Edit only the files the task needs. Do not regenerate or reformat whole files,
    and do not rename, move or delete files outside the task.
 5. **Saved data must keep loading.** Users have data in `localStorage`. New fields on `Db`
@@ -62,7 +61,6 @@ Do not wait until the last message to push. A session that dies mid-edit strands
 npm install
 npm run dev                       # http://localhost:3000
 npm run build
-npm run build:offline-training    # regenerates the single-file training HTML
 npm run lint                      # type check (tsc --noEmit)
 ```
 

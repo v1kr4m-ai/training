@@ -16,10 +16,6 @@ import { ShipSwitcher } from './portal/ShipSwitcher';
 import { trainingKey } from './portal/registry';
 import { TrainingModule } from './training/TrainingModule';
 import { GraduationCap, ShieldCheck, Eye, Download, Upload, HardDrive } from 'lucide-react';
-import curriculum from '../public/data/training_curriculum.json';
-import nominalRoll from '../public/data/nominal_roll.json';
-
-window.__TUSHIL_SEED__ = { 'training_curriculum.json': curriculum, 'nominal_roll.json': nominalRoll };
 
 const StandaloneTrainingShell: React.FC = () => {
   const { shipId, ship } = usePortal();
@@ -164,7 +160,6 @@ const StandaloneTrainingShell: React.FC = () => {
         storageKey={trainingKey(shipId)}
         canEdit={isAdminMode}
         isAdmin={isAdminMode}
-        standalone
       />
     </div>
   );

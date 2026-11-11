@@ -7,10 +7,10 @@ Update it before every push.
 
 - Date: 2026-11-11
 - Tool: Claude Code (Haiku 5.5)
-- Branch: `main`
-- Done: pulled AI Studio commit `93e117d`; deleted merged branches `fix/failing-checks` (GitHub and local) and `docs/agent-setup` (local). Local `main`, `origin/main` and GitHub are all at `93e117d`. No application code changed.
+- Branch: `chore/remove-standalone` (from `main`)
+- Done: removed the standalone single-file HTML from `main` (source, build script, offline guide, generated HTML, npm script, Home and Training links); sample nominal roll now loads on first start only; docs updated.
 
-## Check results (2026-11-10, at `0b548d7` on `main`)
+## Check results (2026-11-11, on `main`)
 
 | Check | Result |
 |---|---|
@@ -33,23 +33,19 @@ Update it before every push.
 
 ## In progress
 
-- `feat/training-topics` (from `main`): training data accessor (`fix/training-data-safety`), Topics tab (add, edit, delete, clear all). Sample curriculum loads on first start only, so Clear all stays cleared after a reload.
-- `feat/standalone-training` (separate, not for `main`): single-file training HTML. Stays on its own branch by owner decision.
+- `chore/remove-standalone`: standalone single-file HTML removed from `main` (files, build script, guide, links); first-start-only sample roster; docs updated.
+- `feat/standalone-training` (separate, not for `main`): the single-file training HTML, now starting empty (no sample data) and with Clear all.
 
 ## Next (in order)
 
-1. Owner: decide about AI Studio's standalone files already on `main` (`src/standalone-training.tsx`, `scripts/build-offline-training.mjs`, `OfflineGuide.md`, the `build:offline-training` script, the root and `public/` HTML). Owner wants standalone off `main`.
-2. LAN Sync packet validation (audit finding 3): check ship id and record shape before merging.
-3. Same first-start-only fix for the Nominal Roll sample: `store.tsx` reloads `nominal_roll.json` whenever the roster is empty, so clearing people brings the sample back.
-4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies, bring `README.md` up to date.
-5. Training calendar improvements: week view, today highlight, instructor filter, mandatory-topic flag with compliance per department, recurring sessions, venue clash check.
-6. Not built yet: Daily Manpower status and daily in/out, Maintenance Calendar.
+1. LAN Sync packet validation (audit finding 3): check ship id and record shape before merging.
+2. Housekeeping (audit finding 10): remove the stray files, pick one lockfile, drop unused dependencies, bring `README.md` up to date.
+3. Training calendar improvements: week view, today highlight, instructor filter, mandatory-topic flag with compliance per department, recurring sessions, venue clash check.
+4. Not built yet: Daily Manpower status and daily in/out, Maintenance Calendar.
 
 ## Decisions waiting for the owner
 
-- Which copy of `tushil-training-offline.html` to keep in git (suggested: `public/` only).
-- Whether a new ship should start with an empty Nominal Roll (audit finding 6).
-- Confirm `public/data/nominal_roll.json` is invented sample data (the repository is public).
+- New ships still start with the sample nominal roll (audit finding 6). Keep or start empty?
 
 ## Open question about tools
 

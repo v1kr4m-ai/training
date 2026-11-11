@@ -11,7 +11,6 @@ on that PC. Other PCs are reached only by carrying a JSON file across (backup/re
 - Stack: React 19, Vite 8, Tailwind 4, TypeScript, `xlsx` (import/export), `recharts` (charts),
   `lucide-react` (icons), `vite-plugin-pwa` (installable, offline cache).
 - Entry: `index.html` -> `src/main.tsx` -> `src/App.tsx` -> `src/portal/PortalApp.tsx`.
-- Second entry: `src/standalone-training.tsx`, bundled into the single-file `tushil-training-offline.html`.
 
 ## Provider tree and routing
 
@@ -107,11 +106,7 @@ open the browser's stored data. Training: `canEdit` for every role except `USER`
 ## Offline delivery
 
 1. **PWA**: `vite.config.ts` configures the service worker to cache the built app. Install from Chrome/Edge.
-2. **Single-file training HTML**: `scripts/build-offline-training.mjs` builds the CSS with Vite, bundles
-   `src/standalone-training.tsx` with esbuild, and writes one self-contained HTML to both the repo root and
-   `public/` (the copy in `public/` is what the in-app download button serves). Opened from `file://`, it has
-   its own storage, separate from the portal's.
-3. **Dev server**: `Tushil.bat` runs Vite on port 3000.
+2. **Dev server**: `Tushil.bat` runs Vite on port 3000.
 
 ## Moving data between PCs
 
@@ -130,32 +125,24 @@ open the browser's stored data. Training: `canEdit` for every role except `USER`
    Rights should come from the user's role only.
 3. **LAN Sync import trusts the file.** No check that the packet's `shipId` matches the open ship, no check of
    record shape, incoming records overwrite existing ones field by field, and a leave request is replaced when
-   the incoming history is at least as long (not newer). `OfflineGuide.md` calls the bundle "signed"; nothing
-   is signed.
+   the incoming history is at least as long (not newer). Nothing in the packet is signed.
 4. **LAN Sync writes training sessions straight to `localStorage`.** If the Training page is open at that
    moment, its in-memory state overwrites the merged sessions on its next save.
-5. **Standalone training HTML has no login.** It offers an "Admin / Planner" toggle to anyone, its backup
+5. **Standalone training HTML (branch `feat/standalone-training` only) has no login.** It offers an "Admin / Planner" toggle to anyone, its backup
    exports every `localStorage` key (including user password hashes if a portal database exists there), and
    its restore writes any key from the file.
-6. **New ships are not empty.** `store.tsx` loads `public/data/nominal_roll.json` whenever a ship's personnel
-   list is empty, so a newly added ship is seeded with the sample people. The README says a new ship starts empty.
-7. **Two self-checks fail** (see `PROJECT_STATUS.md`): `leave.check.ts` still expects the old approval chain;
-   `scheduler.check.ts` "same start without an end overlaps" fails and needs investigating before trusting
-   overlap detection for sessions with no duration.
+6. **New ships are not empty.** `store.tsx` loads `public/data/nominal_roll.json` on a ship's first start only, so a newly added ship is seeded with the sample people. The README says a new ship starts empty.
+7. **Self-checks** were failing on 2026-11-10; fixed.
 8. **Storage ceiling.** Browsers allow roughly 5 MB of `localStorage` per origin. The `Db` blob holds
    photos (up to 450 KB each), notifications and daily orders that only grow. A failed save is logged to the
    console only; the user is not told.
-9. **Split state.** The training state is read and written from five places outside `TrainingModule`. Moving
-   it behind one shared accessor (or into the store) would remove finding 4 and the stale-read risk on Home
-   and Daily Orders.
-10. **Generated file in git, twice.** Each rebuild commits two identical 3 MB copies of
-    `tushil-training-offline.html`. Keeping only the `public/` copy halves that.
-11. **Housekeeping.** Stray tracked files: `src/portal/PortalApp.tsx` with a trailing backtick in its name,
+9. **Split state** fixed: training data is read and written through one accessor (`src/training/trainingStorage.ts`).
+10. **Housekeeping.** Stray tracked files: `src/portal/PortalApp.tsx` with a trailing backtick in its name,
     `src/components/TopicIngestionModal.tsx.bak`, `codex_ori.ps1`. Two lockfiles (`package-lock.json`,
     `bun.lock`). Dependencies with no import in `src/` or `scripts/`: `express`, `dotenv`, `@google/genai`,
     `d3`, `@types/d3`, `motion`, `react-is` (confirm `react-is` is not a `recharts` peer requirement before
     removing). `package.json` name is still `react-example`. `.env.example` describes a Gemini API key the app
     does not use. `README.md` lists Daily Order as not built.
-12. **Large files.** `Forecast.tsx` (1,545 lines), `WatchAndStationBillManager.tsx` (1,215),
+11. **Large files.** `Forecast.tsx` (1,545 lines), `WatchAndStationBillManager.tsx` (1,215),
     `DailyOrdersPage.tsx` (1,150), `TrainingModule.tsx` (1,142). Agents that rewrite whole files are most
     likely to cause damage here; split them when next working in them.

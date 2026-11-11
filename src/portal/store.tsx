@@ -11,7 +11,6 @@ import { dbKey, ShipRef, sessionKey } from './registry';
 import { blankShip, ShipProfile } from './ship';
 import { TUSHIL_ID, tushilSeed } from './tushilSeed';
 import { useShips } from './ships';
-import { loadSeedJson } from '../utils/seedData';
 import type { Db, Person, User } from './types';
 
 /** Profile a ship starts with before anyone edits it. */
@@ -71,18 +70,22 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
     try { localStorage.setItem(DB, JSON.stringify(db)); } catch (e) { console.error('Could not save the portal data', e); }
   }, [db, DB]);
 
-  // Auto-load nominal roll from external asset file if empty (avoids embedding data in code)
+  // Sample nominal roll on first start only, so a roster the administrator cleared stays empty
+  const [isFirstStart] = useState(() => {
+    try { return localStorage.getItem(DB) === null; } catch { return false; }
+  });
   useEffect(() => {
-    if (db.personnel.length === 0) {
-      loadSeedJson<Person[]>('nominal_roll.json')
-        .then(data => {
+    if (isFirstStart && db.personnel.length === 0) {
+      fetch('/data/nominal_roll.json')
+        .then(res => (res.ok ? res.json() : null))
+        .then((data: Person[] | null) => {
           if (Array.isArray(data) && data.length > 0) {
             setDb(prev => (prev.personnel.length === 0 ? { ...prev, personnel: data } : prev));
           }
         })
         .catch(err => console.info('Note: external nominal_roll.json not loaded:', err));
     }
-  }, [db.personnel.length]);
+  }, []);
 
   const [navPosition, setNavPosition] = useState<'top' | 'side'>(() => {
     try { return (localStorage.getItem('nav_position' as string) as 'top' | 'side') || 'top'; } catch { return 'top'; }
