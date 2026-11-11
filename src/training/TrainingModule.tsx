@@ -54,6 +54,7 @@ import { TrainingQuickActionsFAB } from '../components/TrainingQuickActionsFAB';
 import { DailyOrdersPublisher } from '../components/DailyOrdersPublisher';
 import { TrainingAttendanceMuster } from '../components/TrainingAttendanceMuster';
 import { readTraining, TRAINING_CHANGED } from './trainingStorage';
+import { loadSeedJson } from '../utils/seedData';
 import { 
   Calendar, 
   Sliders, 
@@ -76,7 +77,7 @@ import {
 const READ_ONLY_TABS: ActiveTab[] = ['PUBLIC', 'DEPARTMENTS', 'QUARTERLY', 'MUSTER'];
 
 /** Training scheduler. With canEdit false only the calendar, ship dossier and department views are available. */
-export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEdit: boolean; isAdmin?: boolean; storageKey: string }) {
+export function TrainingModule({ canEdit, isAdmin = false, standalone = false, storageKey }: { canEdit: boolean; isAdmin?: boolean; standalone?: boolean; storageKey: string }) {
   const STORAGE_KEY = storageKey;
   const { ship, customHeaders } = usePortal();
   const [activeTab, setActiveTabRaw] = useState<ActiveTab>(canEdit ? 'DASHBOARD' : 'PUBLIC');
@@ -168,9 +169,8 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   // Auto-load training curriculum and sessions from external asset file if both are empty (without embedding in code)
   useEffect(() => {
     if (topics.length === 0 && sessions.length === 0) {
-      fetch('/data/training_curriculum.json')
-        .then(res => (res.ok ? res.json() : null))
-        .then((data: { topics?: Topic[]; sessions?: ScheduledSession[] } | null) => {
+      loadSeedJson<{ topics?: Topic[]; sessions?: ScheduledSession[] }>('training_curriculum.json')
+        .then(data => {
           if (data && Array.isArray(data.topics) && data.topics.length > 0) {
             setTopics(data.topics);
           }
@@ -639,15 +639,17 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
               <span>Export CSV</span>
             </button>
 
-            <a
-              href="/tushil-training-offline.html"
-              download="tushil-training-offline.html"
-              title="Download the entire Training Module as a single self-contained HTML file that runs 100% offline on any PC"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-500/40 transition-colors shadow-sm active:scale-95"
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span>Offline HTML</span>
-            </a>
+            {!standalone && (
+              <a
+                href="/tushil-training-offline.html"
+                download="tushil-training-offline.html"
+                title="Download the entire Training Module as a single self-contained HTML file that runs 100% offline on any PC"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white border border-emerald-500/40 transition-colors shadow-sm active:scale-95"
+              >
+                <Database className="w-3.5 h-3.5" />
+                <span>Offline HTML</span>
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -726,15 +728,17 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
               </>
             )}
 
-            <a
-              href="/tushil-training-offline.html"
-              download="tushil-training-offline.html"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
-              title="Download the entire Training Module in a single standalone HTML file to share via USB or run offline on any PC"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Offline Training (.HTML)</span>
-            </a>
+            {!standalone && (
+              <a
+                href="/tushil-training-offline.html"
+                download="tushil-training-offline.html"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors shadow-sm"
+                title="Download the entire Training Module in a single standalone HTML file to share via USB or run offline on any PC"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Offline Training (.HTML)</span>
+              </a>
+            )}
 
             <button
               onClick={() => setIsOfflineGuideOpen(true)}
@@ -1094,14 +1098,16 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
                 <p className="text-xs text-slate-400">How to download, share, and run the Training Module and core portal offline</p>
               </div>
               <div className="flex items-center gap-2">
-                <a
-                  href="/tushil-training-offline.html"
-                  download="tushil-training-offline.html"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Offline .HTML</span>
-                </a>
+                {!standalone && (
+                  <a
+                    href="/tushil-training-offline.html"
+                    download="tushil-training-offline.html"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download Offline .HTML</span>
+                  </a>
+                )}
                 <button
                   onClick={() => setIsOfflineGuideOpen(false)}
                   className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"

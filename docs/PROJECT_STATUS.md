@@ -41,7 +41,7 @@ Nothing half-done in code.
    (`src/training/trainingStorage.ts`); LAN Sync merge and department rename no longer overwrite an open
    Training page (audit findings 4 and 9). Browser-tested: external change shows on the open page.
 2. LAN Sync packet validation (audit finding 3): check ship id and record shape before merging.
-3. Standalone training HTML login (audit finding 5): needs an owner decision (see below).
+3. Standalone training HTML (`feat/standalone-training`, stacked on `fix/training-data-safety`): full training module in one file, no login by owner decision. Seed data bundled; server-path download links hidden. Browser-tested from a static server; not yet tested from `file://` or on Edge/Chrome at the organisation.
 4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies,
    bring `README.md` up to date.
 5. Training calendar improvements: week view, today highlight, instructor filter, mandatory-topic flag with
@@ -52,7 +52,6 @@ Nothing half-done in code.
 
 - Which copy of `tushil-training-offline.html` to keep in git (suggested: `public/` only).
 - Whether a new ship should start with an empty Nominal Roll (audit finding 6).
-- Whether the standalone training HTML should require a login (audit finding 5).
 - Confirm `public/data/nominal_roll.json` is invented sample data (the repository is public).
 
 ## Open question about tools

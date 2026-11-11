@@ -11,6 +11,7 @@ import { dbKey, ShipRef, sessionKey } from './registry';
 import { blankShip, ShipProfile } from './ship';
 import { TUSHIL_ID, tushilSeed } from './tushilSeed';
 import { useShips } from './ships';
+import { loadSeedJson } from '../utils/seedData';
 import type { Db, Person, User } from './types';
 
 /** Profile a ship starts with before anyone edits it. */
@@ -73,9 +74,8 @@ export const PortalProvider: React.FC<{ ship: ShipRef; children: React.ReactNode
   // Auto-load nominal roll from external asset file if empty (avoids embedding data in code)
   useEffect(() => {
     if (db.personnel.length === 0) {
-      fetch('/data/nominal_roll.json')
-        .then(res => (res.ok ? res.json() : null))
-        .then((data: Person[] | null) => {
+      loadSeedJson<Person[]>('nominal_roll.json')
+        .then(data => {
           if (Array.isArray(data) && data.length > 0) {
             setDb(prev => (prev.personnel.length === 0 ? { ...prev, personnel: data } : prev));
           }
