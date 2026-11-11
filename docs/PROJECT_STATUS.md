@@ -37,13 +37,15 @@ Nothing half-done in code.
 
 ## Next (in order)
 
-1. Audit finding 2 is on branch `fix/approval-roles`: approval rights and leave routing now use the user's role only. Review, then merge.
-2. Audit findings 3 and 4: validate LAN Sync packets (ship id, record shape) and stop writing training
-   sessions around the Training page's state.
+1. Merge `fix/training-data-safety` after review: training state is read and written through one accessor
+   (`src/training/trainingStorage.ts`); LAN Sync merge and department rename no longer overwrite an open
+   Training page (audit findings 4 and 9). Browser-tested: external change shows on the open page.
+2. LAN Sync packet validation (audit finding 3): check ship id and record shape before merging.
+3. Standalone training HTML login (audit finding 5): needs an owner decision (see below).
 4. Housekeeping (audit finding 11): remove the stray files, pick one lockfile, drop unused dependencies,
    bring `README.md` up to date.
-5. Training calendar improvements the owner asked about: week view, today highlight, instructor filter,
-   mandatory-topic flag with compliance per department, recurring sessions, venue clash check.
+5. Training calendar improvements: week view, today highlight, instructor filter, mandatory-topic flag with
+   compliance per department, recurring sessions, venue clash check.
 6. Not built yet: Daily Manpower status and daily in/out, Maintenance Calendar.
 
 ## Decisions waiting for the owner

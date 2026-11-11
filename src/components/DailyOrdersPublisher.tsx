@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react';
 import { ScheduledSession } from '../types';
 import { usePortal } from '../portal/store';
 import { trainingKey } from '../portal/registry';
+import { readTraining } from '../training/trainingStorage';
 import { formatDate } from '../utils/scheduler';
 import { 
   FileText, 
@@ -50,14 +51,8 @@ export const DailyOrdersPublisher: React.FC<DailyOrdersPublisherProps> = ({
   // Read sessions for this ship
   const allSessions = useMemo(() => {
     if (sessionsOverride && sessionsOverride.length > 0) return sessionsOverride;
-    try {
-      const raw = localStorage.getItem(trainingKey(shipId));
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed?.sessions) ? (parsed.sessions as ScheduledSession[]) : [];
-    } catch {
-      return [];
-    }
+    const sessions = readTraining(trainingKey(shipId))?.sessions;
+    return Array.isArray(sessions) ? (sessions as ScheduledSession[]) : [];
   }, [shipId, sessionsOverride]);
 
   // Filter sessions for targetDate

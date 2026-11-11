@@ -6,6 +6,7 @@
 import React, { useRef, useState } from 'react';
 import { usePortal } from './store';
 import { trainingKey } from './registry';
+import { patchTraining, readTraining } from '../training/trainingStorage';
 import { DEPARTMENT_NAMES } from '../data/departments';
 import { downloadBlob } from '../utils/exporters';
 import { useOnlineStatus } from '../utils/usePWAInstall';
@@ -53,16 +54,8 @@ export const LanSyncManager: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportSyncPacket = () => {
-    const tKey = trainingKey(shipId);
-    let trainingSessions: ScheduledSession[] = [];
-    try {
-      const raw = JSON.parse(localStorage.getItem(tKey) || 'null');
-      if (raw && Array.isArray(raw.sessions)) {
-        trainingSessions = raw.sessions;
-      }
-    } catch {
-      // ignore
-    }
+    const saved = readTraining(trainingKey(shipId));
+    const trainingSessions: ScheduledSession[] = Array.isArray(saved?.sessions) ? saved.sessions : [];
 
     const filterByDept = (dept?: string) =>
       selectedDept === 'ALL' || !dept || dept.toLowerCase() === selectedDept.toLowerCase();
@@ -190,16 +183,12 @@ export const LanSyncManager: React.FC = () => {
           };
         });
 
-        // 6. Merge Training Sessions & Attendance Musters in localStorage
-        if (Array.isArray(packet.trainingSessions) && packet.trainingSessions.length > 0) {
-          const tKey = trainingKey(shipId);
-          try {
-            const currentTraining = JSON.parse(localStorage.getItem(tKey) || 'null') || {};
-            const currentSessions: ScheduledSession[] = Array.isArray(currentTraining.sessions)
-              ? [...currentTraining.sessions]
-              : [];
-
-            packet.trainingSessions.forEach(incSession => {
+        // 6. Merge Training Sessions & Attendance Musters into the saved training state
+        const incomingSessions = packet.trainingSessions;
+        if (Array.isArray(incomingSessions) && incomingSessions.length > 0) {
+          const saved = patchTraining(trainingKey(shipId), current => {
+            const currentSessions: ScheduledSession[] = Array.isArray(current.sessions) ? [...current.sessions] : [];
+            incomingSessions.forEach(incSession => {
               const idx = currentSessions.findIndex(s => s.id === incSession.id);
               if (idx >= 0) {
                 currentSessions[idx] = {
@@ -212,17 +201,11 @@ export const LanSyncManager: React.FC = () => {
               }
               mergedTrainingMusters++;
             });
-
-            localStorage.setItem(
-              tKey,
-              JSON.stringify({
-                ...currentTraining,
-                sessions: currentSessions,
-                lastSaved: new Date().toISOString()
-              })
-            );
-          } catch (err) {
-            console.warn('Could not merge training sessions:', err);
+            return { sessions: currentSessions };
+          });
+          if (!saved) {
+            mergedTrainingMusters = 0;
+            console.warn('Could not merge training sessions: saved training data unreadable or storage blocked.');
           }
         }
 

@@ -6,6 +6,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { usePortal } from '../store';
 import { trainingKey } from '../registry';
+import { readTraining } from '../../training/trainingStorage';
 import { ScheduledSession } from '../../types';
 import { formatDate } from '../../utils/scheduler';
 import { btnDanger, btnGhost, btnPrimary, Card, Empty, Field, inputCls, PageHeader } from '../ui';
@@ -67,14 +68,8 @@ export const DailyOrdersPage: React.FC = () => {
 
   // Load training sessions for the ship
   const allTrainingSessions = useMemo<ScheduledSession[]>(() => {
-    try {
-      const raw = localStorage.getItem(trainingKey(shipId));
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed?.sessions) ? parsed.sessions : [];
-    } catch {
-      return [];
-    }
+    const sessions = readTraining(trainingKey(shipId))?.sessions;
+    return Array.isArray(sessions) ? sessions : [];
   }, [shipId]);
 
   // Filter sessions matching target date

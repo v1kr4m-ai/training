@@ -53,6 +53,7 @@ import { TrainingGlobalFilterBar } from '../components/TrainingGlobalFilterBar';
 import { TrainingQuickActionsFAB } from '../components/TrainingQuickActionsFAB';
 import { DailyOrdersPublisher } from '../components/DailyOrdersPublisher';
 import { TrainingAttendanceMuster } from '../components/TrainingAttendanceMuster';
+import { readTraining, TRAINING_CHANGED } from './trainingStorage';
 import { 
   Calendar, 
   Sliders, 
@@ -82,16 +83,7 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
   const setActiveTab = (t: ActiveTab) => setActiveTabRaw(canEdit || READ_ONLY_TABS.includes(t) ? t : 'PUBLIC');
 
   // Core Persistent State (starts empty: topics come from the Import dialog or a JSON restore)
-  const saved = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') as Partial<{
-        year: number; topics: Topic[]; blackoutDates: HolidayEntry[]; sessions: ScheduledSession[]; settings: ScheduleSettings;
-      }> | null;
-    } catch (e) {
-      console.warn('Could not read saved matrix state:', e);
-      return null;
-    }
-  }, []);
+  const saved = useMemo(() => readTraining(STORAGE_KEY), []);
 
   const [year, setYear] = useState<number>(() => (typeof saved?.year === 'number' ? saved.year : 2026));
   const [settings, setSettings] = useState<ScheduleSettings>(() => normalizeSettings(saved?.settings));
@@ -219,6 +211,22 @@ export function TrainingModule({ canEdit, isAdmin = false, storageKey }: { canEd
       console.error('Failed to persist matrix state to localStorage:', err);
     }
   }, [year, topics, blackoutDates, sessions, settings]);
+
+  // LAN Sync or a department rename changed the saved data: take it over so the next save does not undo it
+  useEffect(() => {
+    const onExternal = (e: Event) => {
+      if ((e as CustomEvent<{ key: string }>).detail?.key !== STORAGE_KEY) return;
+      const s = readTraining(STORAGE_KEY);
+      if (!s) return;
+      if (typeof s.year === 'number') setYear(s.year);
+      if (s.settings) setSettings(normalizeSettings(s.settings));
+      if (Array.isArray(s.topics)) setTopics(s.topics);
+      if (Array.isArray(s.blackoutDates)) setBlackoutDates(s.blackoutDates);
+      if (Array.isArray(s.sessions)) setSessions(s.sessions);
+    };
+    window.addEventListener(TRAINING_CHANGED, onExternal);
+    return () => window.removeEventListener(TRAINING_CHANGED, onExternal);
+  }, [STORAGE_KEY]);
 
   // Handlers for Session Modifications
   const handleUpdateSession = (updatedSession: ScheduledSession) => {
