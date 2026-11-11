@@ -98,15 +98,16 @@ const userOfPerson = (db: Db, personId: string) => db.users.find(u => u.active &
  * - HOD / EXO: Commanding Officer (CO) -> Approved
  * - CO: Administrator -> Approved
  */
-export function firstStatus(db: Db, person: Person): LeaveStatus {
-  const user = userOfPerson(db, person.id);
-  const role: Role = user?.role ?? 'USER';
-  const designation = (person.designation || '').toLowerCase();
+/** Role of the login linked to this person; 'USER' when there is none. Designation text grants no role. */
+export function roleOfPerson(db: Db, personId: string): Role {
+  return userOfPerson(db, personId)?.role ?? 'USER';
+}
 
-  if (role === 'CO' || designation.includes('commanding officer')) return 'PENDING_ADMIN';
-  if (role === 'HOD' || role === 'EXO' || designation.includes('head of department') || designation.includes('executive officer')) {
-    return 'PENDING_CO';
-  }
+export function firstStatus(db: Db, person: Person): LeaveStatus {
+  const role = roleOfPerson(db, person.id);
+
+  if (role === 'CO') return 'PENDING_ADMIN';
+  if (role === 'HOD' || role === 'EXO') return 'PENDING_CO';
 
   // Officer leave goes to HOD, then from HOD to CO
   if (person.category === 'Officer') {
@@ -126,10 +127,9 @@ export function canDecide(db: Db, user: User, req: LeaveRequest): boolean {
 
   const applicant = db.personnel.find(p => p.id === req.personId);
   const me = db.personnel.find(p => p.id === user.personId);
-  const userDesignation = (me?.designation || '').toLowerCase();
 
   if (req.status === 'PENDING_CO') {
-    return user.role === 'CO' || userDesignation.includes('commanding officer');
+    return user.role === 'CO';
   }
 
   if (req.status === 'PENDING_ADMIN') {
@@ -137,7 +137,7 @@ export function canDecide(db: Db, user: User, req: LeaveRequest): boolean {
   }
 
   if (req.status === 'PENDING_EXO') {
-    return user.role === 'EXO' || userDesignation.includes('executive officer') || userDesignation.includes('exo');
+    return user.role === 'EXO';
   }
 
   if (req.status === 'PENDING_HOD') {
@@ -287,11 +287,10 @@ export interface ApprovalStepInfo {
  * - Officer: HOD -> CO
  * - HOD: CO
  */
-export function getApprovalRoute(applicant: Person): ApprovalStepInfo[] {
+export function getApprovalRoute(applicant: Person, applicantRole: Role): ApprovalStepInfo[] {
   const isSailor = applicant.category === 'Sailor';
-  const designation = (applicant.designation || '').toLowerCase();
-  const isHod = designation.includes('hod') || designation.includes('head of department') || designation.includes('officer-in-charge');
-  const isExo = designation.includes('executive officer') || designation.includes('exo');
+  const isHod = applicantRole === 'HOD';
+  const isExo = applicantRole === 'EXO';
 
   if (isSailor) {
     return [

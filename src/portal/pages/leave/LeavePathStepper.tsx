@@ -6,7 +6,8 @@
 import React from 'react';
 import { Check, Clock, ShieldAlert, ArrowRight, Bell } from 'lucide-react';
 import type { LeaveEvent, LeaveStatus, Person } from '../../types';
-import { getApprovalRoute, ApprovalStepInfo } from '../../leaveLogic';
+import { getApprovalRoute, ApprovalStepInfo, roleOfPerson } from '../../leaveLogic';
+import { usePortal } from '../../store';
 
 interface LeavePathStepperProps {
   applicant: Person;
@@ -23,7 +24,8 @@ export const LeavePathStepper: React.FC<LeavePathStepperProps> = ({
   gunneryNotified = false,
   compact = false
 }) => {
-  const steps = getApprovalRoute(applicant);
+  const { db } = usePortal();
+  const steps = getApprovalRoute(applicant, roleOfPerson(db, applicant.id));
   const isApproved = status === 'APPROVED';
   const isRejected = status === 'REJECTED';
   const isCancelled = status === 'CANCELLED';

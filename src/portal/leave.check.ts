@@ -1,7 +1,7 @@
 // Self-check: node --experimental-strip-types src/portal/leave.check.ts
 import { emptyDb, parseDb } from './db.ts';
 import { hashPassword, newSalt, verifyPassword } from './auth.ts';
-import { balances, canDecide, daysBetween, firstStatus, monthlyForecast, shortfalls, statusAfterApproval, validateApplication } from './leaveLogic.ts';
+import { balances, canDecide, daysBetween, firstStatus, getApprovalRoute, monthlyForecast, shortfalls, statusAfterApproval, validateApplication } from './leaveLogic.ts';
 import { blankShip } from './ship.ts';
 import { tushilSeed } from './tushilSeed.ts';
 import type { Db, LeaveRequest, Person, User } from './types.ts';
@@ -47,6 +47,14 @@ ok(!canDecide(db, db.users[2], req({})), 'CO cannot skip HoD stage');
 ok(!canDecide(db, db.users[1], req({ personId: 'x' })), 'HoD of another department cannot decide');
 ok(!canDecide(db, db.users[1], req({ personId: 'hod' })), 'nobody approves own leave');
 ok(canDecide(db, db.users[2], req({ status: 'PENDING_CO' })), 'CO decides at CO stage');
+
+// designation text alone grants no role
+const titled: Db = { ...db, personnel: db.personnel.map(p => (p.id === 'a' ? { ...p, designation: 'Commanding Officer' } : p)) };
+ok(!canDecide(titled, db.users[0], req({ personId: 'x', status: 'PENDING_CO' })), 'designation does not grant CO decision');
+ok(!canDecide(titled, db.users[0], req({ personId: 'x', status: 'PENDING_EXO' })), 'designation does not grant EXO decision');
+ok(firstStatus(titled, { ...db.personnel[4], category: 'Officer', designation: 'Commanding Officer' }) === 'PENDING_CO', 'designation does not route to admin');
+ok(getApprovalRoute({ ...db.personnel[4], category: 'Officer' }, 'USER').some(s => s.role === 'HOD'), 'officer without HOD role routes via HOD');
+ok(getApprovalRoute({ ...db.personnel[4], category: 'Officer' }, 'HOD').every(s => s.role !== 'HOD'), 'HOD role routes straight to CO; designation ignored');
 
 // balances: 10 approved days, 6 already taken as of 2026-06-06
 const withLeave: Db = { ...db, leaveRequests: [req({ status: 'APPROVED' }), req({ id: 'r2', typeId: 'casual', from: '2026-09-01', to: '2026-09-03', days: 3, status: 'PENDING_CO' })] };
